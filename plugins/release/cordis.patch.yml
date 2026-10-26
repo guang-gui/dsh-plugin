@@ -1,0 +1,26 @@
+# dsh-plugin-release 的组合包补丁层。
+#
+# 安装到 profile 后，这一层会在 @deepseek-ai/dsh-base 之后应用，插入一个插件行。
+# 用户可以在自己 profile 的 cordis.patch.yml 里按 id `release` 覆盖整行 config
+# ——注意 patch 是「替换整个 config」，不是逐键合并，所以要重述需要的每个键。
+- insert:
+    - id: release
+      name: dsh-plugin-release
+      config:
+        # 本地仓库根目录；插件会递归扫描并识别 Git 仓库（含 worktree）
+        # 换成你自己的代码目录即可，可以写多个
+        roots:
+          - 'D:\code'
+        scanDepth: 2
+        defaultTarget: master
+        gitlab:
+          # 例如 https://git.example.com
+          baseUrl: ''
+          # 建议用环境变量注入，不要把令牌写进配置文件
+          tokenEnv: GITLAB_TOKEN
+        # 预检并发：自建 GitLab 上 8 是拐点，再高反而更慢
+        concurrency: 8
+        # 分支 SHA 缓存有效期（秒），0 表示每次重新问远端
+        headCacheTtlSec: 300
+        mergeStrategy: merge
+        deleteSourceBranch: false

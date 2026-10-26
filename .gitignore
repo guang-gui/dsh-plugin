@@ -1,0 +1,9 @@
+# 依赖
+node_modules/
+
+# 日志与临时文件
+*.log
+.DS_Store
+Thumbs.db
+
+# 注意：lib/ 是构建产物，但需要随仓库分发（DSH 直接加载），不要忽略
