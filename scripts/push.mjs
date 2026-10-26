@@ -53,17 +53,46 @@ if (!slug) {
 const { owner, repo: REPO } = slug;
 
 async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch(API + path, {
-    method,
-    headers: {
-      authorization: `Bearer ${TOKEN}`,
-      accept: 'application/vnd.github+json',
-      'x-github-api-version': '2022-11-28',
-      'user-agent': 'dsh-plugins-push',
-      ...(body ? { 'content-type': 'application/json' } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  // 并发上传时偶发 ECONNRESET / 502，重试即可；4xx 直接抛。
+  const RETRIES = 4;
+  let lastErr;
+  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+    if (attempt) {
+      const wait = 400 * 2 ** (attempt - 1);
+      await new Promise((r) => setTimeout(r, wait));
+    }
+    try {
+      return await apiOnce(path, method, body);
+    } catch (e) {
+      lastErr = e;
+      const transient = e.network || (e.status >= 500 && e.status < 600) || e.status === 429;
+      if (!transient || attempt === RETRIES) throw e;
+      process.stderr.write(`\n    重试 ${path}（${e.network ? e.cause?.code || e.message : e.status}）\n`);
+    }
+  }
+  throw lastErr;
+}
+
+async function apiOnce(path, method, body) {
+  let res;
+  try {
+    res = await fetch(API + path, {
+      method,
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        accept: 'application/vnd.github+json',
+        'x-github-api-version': '2022-11-28',
+        'user-agent': 'dsh-plugins-push',
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    const err = new Error(`网络错误 ${method} ${path} :: ${e.message}`);
+    err.network = true;
+    err.cause = e;
+    throw err;
+  }
   const text = await res.text();
   let json = null;
   if (text) {
