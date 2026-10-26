@@ -41,6 +41,18 @@ npm run build -w dsh-plugin-release
 npm test -w dsh-plugin-release
 ```
 
+## 推送
+
+本机 `github.com` 主站不可达（HTTPS / SSH 全部超时），只有 `api.github.com` 可通，因此**不能用 `git push`**。改用仓库自带的脚本走 Git Data API：
+
+```sh
+npm run push            # 等价于 node scripts/push.mjs main
+```
+
+脚本会自动判断：远端分支已存在则增量更新（父提交接远端 head，能正确表达文件删除），不存在则首次推送。`owner/repo` 从 `git remote get-url origin` 解析，令牌读 `~/.gh-token` 或 `GH_TOKEN`。
+
+> `origin` 仍然保留着，只是仅作地址记录；直接 `git push` 会卡住。
+
 ## 新增插件
 
 1. 在 `plugins/` 下新建目录，例如 `plugins/foo`
