@@ -10,20 +10,67 @@ DeepSeek Harness（DSH）插件集合。每个插件是 `plugins/` 下的独立�
 
 ## 安装某个插件
 
-```sh
-# 方式一：从本地目录（开发时用）
-dsh plugin --profile web add /path/to/dsh-plugins/plugins/release
+以 `release` 为例，装到桌面版（profile 名 `desktop`）：
 
-# 方式二：从 tarball
+```sh
+# 1. 装依赖（等价于在 profile 目录里跑 pnpm add）
+dsh plugin --profile desktop add link:C:/Users/DSL/dsh-plugins/plugins/release
+```
+
+**关键：`dsh plugin add` 只写 `dependencies` 和 `node_modules`，不会写 `bundles`，插件不会被加载。** 必须手动补上 `~/.dsh/profiles/desktop/package.json`：
+
+```json
+{
+  "dependencies": { "dsh-plugin-release": "link:C:/Users/DSL/dsh-plugins/plugins/release" },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "dsh-plugin-release"      // ← 少这一行插件就不生效
+      ]
+    }
+  }
+}
+```
+
+**2. 配插件参数。** 插件自带的 `cordis.patch.yml` 只是默认值（`roots: ['D:\code']`），实际路径要写进 profile 的 `cordis.patch.yml`。注意 patch 语义是**替换整个 config**，不是逐键合并，所以要重述每个键：
+
+```yaml
+- id: release
+  config:
+    roots:
+      - 'D:\xls-code'
+    scanDepth: 2
+    defaultTarget: master
+    gitlab:
+      baseUrl: 'https://git.example.com'
+      tokenEnv: GITLAB_TOKEN      # 令牌走环境变量，别写进文件
+    concurrency: 8
+    headCacheTtlSec: 300
+    mergeStrategy: merge
+    deleteSourceBranch: false
+```
+
+**3. 生效。** 桌面版会**热加载** profile，改完 `package.json` / `cordis.patch.yml` 等几秒就生效，不用重启应用。验证：
+
+```sh
+curl http://127.0.0.1:<桌面版端口>/release-ui          # 200 + HTML
+curl http://127.0.0.1:<桌面版端口>/release-ui/api/projects
+```
+
+端口在 `Get-NetTCPConnection` 里找 `DeepSeek Harness` 进程的监听端口（当前是 19387）。侧边栏应出现「发版」按钮。
+
+其他 profile（`web` / `headless`）同理，把 `--profile desktop` 换掉即可。CLI 版的 profile 可以用 `dsh --profile web --dump-config | grep release` 校验组合结果；**`desktop` profile 由 Electron 独占，`--dump-config` 会拒绝执行**，只能靠上面的 HTTP 探测。
+
+### 从 tarball 安装
+
+```sh
 cd plugins/release && pnpm pack
-dsh plugin --profile web add ./dsh-plugin-release-0.1.0.tgz
+dsh plugin --profile desktop add ./dsh-plugin-release-0.1.0.tgz
 ```
 
-安装后确认加载层：
-
-```sh
-dsh --profile web --dump-config | grep release
-```
+`bundles` 那一步同样不能省。
 
 ## 开发
 
