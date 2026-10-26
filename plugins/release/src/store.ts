@@ -6,9 +6,10 @@
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { MergePlan, Project } from './types.js';
+import type { MergePlan, Project, TaskRecord } from './types.js';
 
 const MAX_PLANS = 30;
+const MAX_TASKS = 50;
 
 interface ProjectsFile {
   savedAt: string;
@@ -17,6 +18,10 @@ interface ProjectsFile {
 
 interface PlansFile {
   plans: MergePlan[];
+}
+
+interface TasksFile {
+  tasks: TaskRecord[];
 }
 
 function readJson<T>(file: string): T | null {
@@ -39,6 +44,7 @@ export class JsonStore {
   private projects: Project[] = [];
   private savedAt = '';
   private plans = new Map<string, MergePlan>();
+  private tasks: TaskRecord[] = [];
 
   constructor(private readonly dir: string) {}
 
@@ -48,6 +54,10 @@ export class JsonStore {
 
   get plansFile(): string {
     return join(this.dir, 'plans.json');
+  }
+
+  get tasksFile(): string {
+    return join(this.dir, 'tasks.json');
   }
 
   load(): void {
@@ -61,6 +71,10 @@ export class JsonStore {
       if (plan?.id) this.plans.set(plan.id, plan);
     }
     this.prunePlans();
+    const tasks = readJson<TasksFile>(this.tasksFile);
+    if (Array.isArray(tasks?.tasks)) {
+      this.tasks = tasks.tasks.filter((t) => t?.id).slice(0, MAX_TASKS);
+    }
   }
 
   get list(): Project[] {
@@ -100,5 +114,19 @@ export class JsonStore {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, MAX_PLANS);
     this.plans = new Map(alive.map((p) => [p.id, p]));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 任务中心                                                            */
+  /* ------------------------------------------------------------------ */
+
+  /** 最近的执行记录，新的在前 */
+  get taskList(): TaskRecord[] {
+    return this.tasks;
+  }
+
+  addTask(task: TaskRecord): void {
+    this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)].slice(0, MAX_TASKS);
+    writeJson(this.tasksFile, { tasks: this.tasks });
   }
 }

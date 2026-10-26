@@ -18,25 +18,54 @@
 - 样式使用 DSH 的设计变量（`--dsw-alias-*`），自动跟随浅色/深色主题
 - 页面数据来自宿主接口 `/release-ui/api/*`，与对话工具调用同一份 `ReleaseService`
 
-### 独立网页（备用）
+### 独立网页（主力界面）
 
 ```
-http://127.0.0.1:3080/release-ui
+http://127.0.0.1:<宿主端口>/release-ui
 ```
 
 - 单文件 HTML（内嵌样式与脚本），不依赖前端构建
 - 命名路由优先于静态资源鉴权，页面不需要 DSH token，但只接受本机（loopback）访问
+- 自带**设置页**与**任务中心**，日常发版完全不用碰 YAML
 - headless 模式下没有 web 服务，页面与面板都不可用，工具照常工作
+
+端口怎么找：桌面版看 `Get-NetTCPConnection` 里 `DeepSeek Harness` 进程的监听端口；CLI 版启动时会直接打印 URL。
+
+### 设置页
+
+| 设置项 | 说明 |
+|---|---|
+| GitLab 地址 | 留空则只能本地合并，不能建 MR |
+| 令牌 | 留空 = 沿用已保存的 / 环境变量；接口只回传末四位 |
+| 扫描目录 | 可逐级浏览点选，标出哪些是 Git 仓库、哪些已选 |
+| 扫描深度 / 默认目标分支 / 并发数 / 缓存有效期 / 合并策略 / 删除源分支 | 同 YAML 里的字段 |
+
+保存后立刻 `service.reconfigure()` 生效，扫描参数变了会自动重扫；**不需要重启 dsh**。
+设置落在 `$DSH_HOME/release-plugin/settings.json`，优先级高于 `cordis.patch.yml`。
+
+### 任务中心
+
+每次「确认执行」都会留一条记录（保留最近 50 条，`tasks.json`）：
+
+- 状态汇总：全部成功 / 部分失败 / 失败
+- 逐仓库明细：成功、无变化、失败原因、MR 链接
+- 「用这些参数重新预检」一键回填
+
+预检不记录——它是只读的，数量多且没有留存价值。
 
 ### 能力对照
 
 | 页面操作 | 接口 | 工具 |
 |---|---|---|
+| 读/存设置 | `GET` `POST /release-ui/api/settings` | — |
+| 测试 GitLab 连接 | `POST /release-ui/api/settings/test` | — |
+| 浏览目录 | `GET /release-ui/api/settings/dirs?path=` | — |
 | 加载/重新扫描仓库 | `GET /release-ui/api/projects` | `release_projects` |
 | 搜分支 | `GET /release-ui/api/branches` | `release_branches` |
 | 预检 | `POST /release-ui/api/check` | `release_check` |
 | 确认执行 | `POST /release-ui/api/apply` | `release_apply` |
 | MR 状态 | `GET /release-ui/api/mrs` | `release_mrs` |
+| 执行记录 | `GET /release-ui/api/tasks` | — |
 
 ## 它解决什么问题
 

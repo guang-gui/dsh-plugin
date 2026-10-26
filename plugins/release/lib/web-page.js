@@ -110,6 +110,26 @@ pre {
 .toast.show { opacity: 1; }
 details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 .muted { color: var(--muted); }
+details summary h2 { display: inline; }
+.browse { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; max-height: 220px; overflow: auto; }
+.browse .row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.browse .row:last-child { border-bottom: 0; }
+.browse .row .name { flex: 1; cursor: pointer; word-break: break-all; }
+.browse .row .name:hover { color: var(--accent); }
+.browse .row button { padding: 2px 10px; font-size: 12px; }
+.root { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--chip); font-size: 13px; }
+.root button { padding: 0 3px; background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
+.root button:hover { color: var(--bad); }
+.inline { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.inline input[type=text] { flex: 1; }
+.inline button { padding: 7px 14px; }
+.task { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.task:last-child { border-bottom: 0; }
+.task > summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.task > summary b { font-weight: 500; }
+.task > summary .muted { font-size: 12px; }
+.task table { margin-top: 10px; }
+.task button { margin-top: 10px; padding: 5px 12px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -118,6 +138,90 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   <div id="status">正在加载…</div>
 </header>
 <main>
+  <div class="card">
+    <details id="settingsCard">
+      <summary><h2>设置</h2> <span class="hint" id="settingsHint">GitLab 地址、令牌、扫描目录</span></summary>
+      <div class="grid" style="margin-top:16px">
+        <label>GitLab 地址</label>
+        <div>
+          <input type="text" id="setBaseUrl" placeholder="https://git.example.com" autocomplete="off">
+          <div class="hint">留空则只能「本地合并后推送」，无法创建或合并 MR</div>
+        </div>
+
+        <label>令牌</label>
+        <div>
+          <input type="password" id="setToken" autocomplete="new-password">
+          <div class="hint" id="setTokenHint"></div>
+        </div>
+
+        <label>扫描目录</label>
+        <div>
+          <div class="chips" id="rootList"></div>
+          <div class="inline">
+            <input type="text" id="browsePath" placeholder="输入目录路径后点「浏览」，例如 D:\\xls-code" autocomplete="off">
+            <button id="browseBtn" class="secondary" type="button">浏览</button>
+            <button id="addRootBtn" class="secondary" type="button">直接添加</button>
+          </div>
+          <div class="browse" id="browseList" hidden></div>
+        </div>
+
+        <label>扫描深度</label>
+        <div>
+          <select id="setDepth">
+            <option value="1">1 层</option>
+            <option value="2">2 层</option>
+            <option value="3">3 层</option>
+            <option value="4">4 层</option>
+            <option value="5">5 层</option>
+            <option value="6">6 层</option>
+            <option value="8">8 层</option>
+          </select>
+          <div class="hint">目录层级深、仓库多时调大；扫描会变慢</div>
+        </div>
+
+        <label>默认目标分支</label>
+        <input type="text" id="setTarget" placeholder="master" autocomplete="off">
+
+        <label>并发数</label>
+        <div>
+          <select id="setConcurrency">
+            <option value="2">2</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="8">8（推荐）</option>
+            <option value="12">12</option>
+            <option value="16">16</option>
+          </select>
+          <div class="hint">自建 GitLab 上 8 是拐点，再高反而更慢</div>
+        </div>
+
+        <label>缓存有效期</label>
+        <div>
+          <input type="text" id="setTtl" placeholder="300" autocomplete="off">
+          <div class="hint">分支 SHA 缓存秒数，0 表示每次重新问远端</div>
+        </div>
+
+        <label>合并策略</label>
+        <select id="setStrategy">
+          <option value="merge">merge（保留合并提交）</option>
+          <option value="ff-only">ff-only（只允许快进）</option>
+          <option value="no-ff">no-ff（总是生成合并提交）</option>
+        </select>
+
+        <label>删除源分支</label>
+        <div>
+          <label class="chip"><input type="checkbox" id="setDelete"> 合并后删除源分支</label>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="saveBtn" type="button">保存设置</button>
+        <button id="testBtn" class="secondary" type="button">测试 GitLab 连接</button>
+        <span class="hint" id="saveHint"></span>
+      </div>
+      <div class="hint" id="testHint" style="margin-top:8px"></div>
+    </details>
+  </div>
+
   <div class="card">
     <h2>发版参数</h2>
     <div class="grid">
@@ -178,6 +282,12 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
     <div class="summary" id="mrSummary"></div>
     <div style="overflow:auto"><table id="mrTable"></table></div>
     <div class="actions"><button id="mrBtn" class="secondary">刷新状态</button></div>
+  </div>
+
+  <div class="card" id="taskCard">
+    <h2>任务中心 <span class="hint" id="taskHint"></span></h2>
+    <div id="taskList"><span class="muted">加载中…</span></div>
+    <div class="actions"><button id="taskReloadBtn" class="secondary" type="button">刷新</button></div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -274,6 +384,302 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
     }).then(function () { busy(false, ''); });
   }
 
+  /* ---------------- 设置 ---------------- */
+
+  var settings = null;
+
+  function renderRoots() {
+    var box = $('rootList');
+    box.innerHTML = '';
+    var roots = (settings && settings.roots) || [];
+    if (!roots.length) {
+      var empty = document.createElement('span');
+      empty.className = 'muted';
+      empty.textContent = '还没有配置扫描目录';
+      box.appendChild(empty);
+      return;
+    }
+    roots.forEach(function (root, index) {
+      var span = document.createElement('span');
+      span.className = 'root';
+      span.appendChild(document.createTextNode(root));
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = '\u00d7';
+      del.title = '移除';
+      del.addEventListener('click', function () {
+        roots.splice(index, 1);
+        renderRoots();
+      });
+      span.appendChild(del);
+      box.appendChild(span);
+    });
+  }
+
+  function applySettingsToForm(v) {
+    settings = v;
+    $('setBaseUrl').value = v.gitlabBaseUrl || '';
+    $('setToken').value = '';
+    $('setToken').placeholder = v.tokenSet
+      ? ('已保存 ' + v.tokenHint + '，留空则不修改')
+      : '粘贴个人访问令牌（scope: api）';
+    $('setTokenHint').textContent = v.tokenSet
+      ? (v.tokenSource === 'saved'
+          ? '令牌存在 ' + v.dataDir + '/settings.json，仅本机可读；接口不会回传明文'
+          : '当前令牌来自配置文件或环境变量 ' + v.tokenEnv + '；在此填写会覆盖它')
+      : '建议用个人访问令牌（scope: api）；项目级令牌只能访问单个项目，跨仓库会 404';
+    $('setDepth').value = String(v.scanDepth);
+    $('setTarget').value = v.defaultTarget || '';
+    $('setConcurrency').value = String(v.concurrency);
+    $('setTtl').value = String(v.headCacheTtlSec);
+    $('setStrategy').value = v.mergeStrategy;
+    $('setDelete').checked = !!v.deleteSourceBranch;
+    renderRoots();
+    $('settingsHint').textContent = (v.gitlabReady ? 'GitLab 已配置' : 'GitLab 未配置完整')
+      + ' · 数据目录 ' + v.dataDir;
+    if (!v.gitlabReady) $('settingsCard').open = true;
+  }
+
+  function loadSettings() {
+    return api('/settings').then(applySettingsToForm).catch(function (e) {
+      $('settingsHint').textContent = '读取设置失败：' + e.message;
+    });
+  }
+
+  function collectSettings() {
+    var patch = {
+      gitlabBaseUrl: $('setBaseUrl').value.trim(),
+      roots: (settings && settings.roots) || [],
+      scanDepth: Number($('setDepth').value),
+      defaultTarget: $('setTarget').value.trim(),
+      concurrency: Number($('setConcurrency').value),
+      headCacheTtlSec: Number($('setTtl').value),
+      mergeStrategy: $('setStrategy').value,
+      deleteSourceBranch: $('setDelete').checked
+    };
+    var token = $('setToken').value.trim();
+    // 留空表示「不改动已保存的令牌」，避免用户只改路径时把令牌清掉
+    if (token) patch.gitlabToken = token;
+    return patch;
+  }
+
+  function doTest() {
+    var body = { gitlabBaseUrl: $('setBaseUrl').value.trim() };
+    var token = $('setToken').value.trim();
+    if (token) body.gitlabToken = token;
+    $('testHint').textContent = '测试中…';
+    api('/settings/test', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
+      $('testHint').textContent = r.ok
+        ? ('连接成功 · 账号 ' + r.account + ' · GitLab ' + (r.version || '未知') + ' · ' + r.ms + 'ms' + (r.note ? ' · ' + r.note : ''))
+        : ('连接失败：' + (r.error || '未知错误'));
+    }).catch(function (e) {
+      $('testHint').textContent = '连接失败：' + e.message;
+    });
+  }
+
+  function doSave() {
+    var patch = collectSettings();
+    $('saveHint').textContent = '保存中…';
+    api('/settings', { method: 'POST', body: JSON.stringify(patch) }).then(function (r) {
+      applySettingsToForm(r.settings);
+      var msgs = [];
+      if (r.rescan) msgs.push('已重新扫描，共 ' + r.rescan.total + ' 个仓库');
+      if (r.warnings && r.warnings.length) msgs.push(r.warnings.join('；'));
+      $('saveHint').textContent = msgs.join(' · ') || '已保存';
+      toast('设置已保存');
+      loadProjects(false);
+    }).catch(function (e) {
+      $('saveHint').textContent = '保存失败：' + e.message;
+    });
+  }
+
+  function addRoot(path) {
+    if (!settings) settings = { roots: [] };
+    if (!settings.roots) settings.roots = [];
+    if (settings.roots.indexOf(path) < 0) settings.roots.push(path);
+    renderRoots();
+    toast('已加入列表，点「保存设置」后生效');
+  }
+
+  function renderBrowse(listing) {
+    var box = $('browseList');
+    box.hidden = false;
+    box.innerHTML = '';
+    $('browsePath').value = listing.path;
+
+    var head = document.createElement('div');
+    head.className = 'row';
+    var pathSpan = document.createElement('span');
+    pathSpan.className = 'name muted';
+    pathSpan.textContent = listing.path;
+    head.appendChild(pathSpan);
+    if (listing.selected) {
+      var tag = document.createElement('span');
+      tag.className = 'tag ok';
+      tag.textContent = '已是扫描目录';
+      head.appendChild(tag);
+    } else {
+      var pick = document.createElement('button');
+      pick.type = 'button';
+      pick.className = 'secondary';
+      pick.textContent = '用这个目录';
+      pick.addEventListener('click', function () { addRoot(listing.path); });
+      head.appendChild(pick);
+    }
+    box.appendChild(head);
+
+    if (listing.error) {
+      var errRow = document.createElement('div');
+      errRow.className = 'row';
+      var bad = document.createElement('span');
+      bad.className = 'tag bad';
+      bad.textContent = listing.error;
+      errRow.appendChild(bad);
+      box.appendChild(errRow);
+      return;
+    }
+
+    if (listing.parent) {
+      var upRow = document.createElement('div');
+      upRow.className = 'row';
+      var upName = document.createElement('span');
+      upName.className = 'name';
+      upName.textContent = '.. 上一级';
+      upName.addEventListener('click', function () { doBrowse(listing.parent); });
+      upRow.appendChild(upName);
+      box.appendChild(upRow);
+    }
+
+    var entries = listing.entries || [];
+    entries.forEach(function (entry) {
+      var row = document.createElement('div');
+      row.className = 'row';
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = entry.name + (entry.isRepo ? '（git）' : '');
+      name.addEventListener('click', function () { doBrowse(entry.path); });
+      row.appendChild(name);
+      if (entry.selected) {
+        var on = document.createElement('span');
+        on.className = 'tag ok';
+        on.textContent = '已选';
+        row.appendChild(on);
+      } else {
+        var add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'secondary';
+        add.textContent = '添加';
+        add.addEventListener('click', function () { addRoot(entry.path); });
+        row.appendChild(add);
+      }
+      box.appendChild(row);
+    });
+
+    if (!entries.length) {
+      var none = document.createElement('div');
+      none.className = 'row';
+      none.innerHTML = '<span class="muted">没有子目录</span>';
+      box.appendChild(none);
+    }
+  }
+
+  function doBrowse(path) {
+    api('/settings/dirs?path=' + encodeURIComponent(path || '')).then(renderBrowse).catch(function (e) {
+      toast('浏览失败：' + e.message);
+    });
+  }
+
+  /* ---------------- 任务中心 ---------------- */
+
+  var MODE_LABEL = { 'create-mr': '建 MR', 'merge-mr': '合并 MR', 'merge-git': '本地合并' };
+  var STATUS_LABEL = {
+    success: ['全部成功', 'ok'],
+    partial: ['部分失败', 'warn'],
+    failed: ['失败', 'bad']
+  };
+
+  function fmtTime(iso) {
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? String(iso || '') : d.toLocaleString();
+  }
+
+  function fmtDuration(ms) {
+    if (!ms && ms !== 0) return '—';
+    return ms < 1000 ? (ms + 'ms') : ((ms / 1000).toFixed(1) + 's');
+  }
+
+  function renderTasks(view) {
+    var box = $('taskList');
+    box.innerHTML = '';
+    var tasks = view.tasks || [];
+    $('taskHint').textContent = tasks.length ? ('最近 ' + tasks.length + ' 次执行') : '';
+    if (!tasks.length) {
+      var none = document.createElement('span');
+      none.className = 'muted';
+      none.textContent = '执行过一次发版后，这里会留下记录（含失败的仓库）';
+      box.appendChild(none);
+      return;
+    }
+
+    tasks.forEach(function (t) {
+      var det = document.createElement('details');
+      det.className = 'task';
+
+      var sum = document.createElement('summary');
+      var st = STATUS_LABEL[t.status] || [t.status, 'plain'];
+      var tag = document.createElement('span');
+      tag.className = 'tag ' + st[1];
+      tag.textContent = st[0];
+      sum.appendChild(tag);
+
+      var head = document.createElement('b');
+      head.textContent = t.sourceBranch + ' → ' + t.targetBranch;
+      sum.appendChild(head);
+
+      var meta = document.createElement('span');
+      meta.className = 'muted';
+      meta.textContent = (MODE_LABEL[t.mode] || t.mode)
+        + ' · ' + t.total + ' 个仓库 · 成功 ' + t.succeeded + ' / 失败 ' + t.failed + ' / 跳过 ' + t.skipped
+        + ' · ' + fmtDuration(t.durationMs) + ' · ' + fmtTime(t.startedAt);
+      sum.appendChild(meta);
+      det.appendChild(sum);
+
+      var rows = ['<tr><th>仓库</th><th>结果</th><th>说明</th></tr>'];
+      (t.results || []).forEach(function (r) {
+        var cls = r.ok ? 'ok' : (r.kind === 'noop' ? 'plain' : 'bad');
+        var label = r.ok ? '成功' : (r.kind === 'noop' ? '无变化' : '失败');
+        var msg = esc(r.message);
+        if (r.url) msg += ' · <a href="' + esc(r.url) + '" target="_blank" rel="noreferrer">打开</a>';
+        rows.push('<tr><td>' + esc(r.name) + '</td><td><span class="tag ' + cls + '">' + label + '</span></td><td>' + msg + '</td></tr>');
+      });
+      var holder = document.createElement('div');
+      holder.innerHTML = '<table>' + rows.join('') + '</table>';
+      det.appendChild(holder);
+
+      var redo = document.createElement('button');
+      redo.type = 'button';
+      redo.className = 'secondary';
+      redo.textContent = '用这些参数重新预检';
+      redo.addEventListener('click', function () {
+        $('mode').value = t.mode;
+        $('source').value = t.sourceBranch;
+        $('target').value = t.targetBranch;
+        if (t.title) $('title').value = t.title;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        toast('参数已回填，点「预检」继续');
+      });
+      det.appendChild(redo);
+
+      box.appendChild(det);
+    });
+  }
+
+  function loadTasks() {
+    return api('/tasks').then(renderTasks).catch(function (e) {
+      $('taskHint').textContent = '读取失败：' + e.message;
+    });
+  }
+
   function statusTag(item) {
     if (item.noop) return '<span class="tag plain">无变化</span>';
     if (item.executable) return '<span class="tag ok">可执行</span>';
@@ -326,6 +732,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
     $('applyTable').innerHTML = rows.join('');
     $('mrCard').hidden = false;
     loadMrs();
+    loadTasks();
   }
 
   function mrLabel(status) {
@@ -437,7 +844,19 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   $('mrBtn').addEventListener('click', function () { loadMrs().then(function () { toast('MR 状态已刷新'); }); });
   $('source').addEventListener('keydown', function (e) { if (e.key === 'Enter') doCheck(); });
 
-  loadProjects(false);
+  $('saveBtn').addEventListener('click', doSave);
+  $('testBtn').addEventListener('click', doTest);
+  $('browseBtn').addEventListener('click', function () { doBrowse($('browsePath').value.trim()); });
+  $('addRootBtn').addEventListener('click', function () {
+    var p = $('browsePath').value.trim();
+    if (!p) { toast('先填目录路径'); return; }
+    addRoot(p);
+  });
+  $('browsePath').addEventListener('keydown', function (e) { if (e.key === 'Enter') doBrowse($('browsePath').value.trim()); });
+  $('taskReloadBtn').addEventListener('click', function () { loadTasks().then(function () { toast('任务记录已刷新'); }); });
+
+  loadSettings().then(function () { loadProjects(false); });
+  loadTasks();
 })();
 </script>
 </body>

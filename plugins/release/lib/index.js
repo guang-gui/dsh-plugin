@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import Schema from '@deepseek-ai/schemastery';
 import { GitExecutor } from './git.js';
 import { ReleaseService } from './service.js';
+import { buildResolved, createSettingsBridge, initialSettings } from './settings-bridge.js';
+import { SettingsStore } from './settings.js';
 import { registerTools } from './tools.js';
 import { registerWebUi } from './web.js';
 export const name = 'release';
@@ -63,12 +65,16 @@ function createLogger() {
     };
 }
 export function apply(ctx, config) {
-    const resolved = resolveConfig(config);
-    const service = new ReleaseService(resolved, new GitExecutor(resolved.gitPath), createLogger());
+    const base = resolveConfig(config);
+    const store = new SettingsStore(base.dataDir);
+    const initial = initialSettings(base, store.load());
+    const effective = buildResolved(base, initial);
+    const service = new ReleaseService(effective, new GitExecutor(effective.gitPath), createLogger());
+    const { bridge } = createSettingsBridge({ service, store, base, initial });
     // 注册是 effect 语义：插件卸载时工具自动撤销，不需要手工反注册
     registerTools(ctx, service);
     // 同一套服务再挂一个浏览器页面，日常操作不必经过模型
-    registerWebUi(ctx, service);
+    registerWebUi(ctx, { service, settings: bridge });
     ctx.effect(() => () => service.dispose());
 }
 function resolveConfig(config) {

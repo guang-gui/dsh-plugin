@@ -1,5 +1,5 @@
 import type { GitExecutor } from './git.js';
-import type { ApplyResult, MergePlan, MergeStrategy, MrRef, PlanMode, Project } from './types.js';
+import type { ApplyResult, MergePlan, MergeStrategy, MrRef, PlanMode, Project, TaskRecord } from './types.js';
 export interface ConfigProject {
     /** GitLab path_with_namespace 或 remote URL，用来匹配扫描结果 */
     path?: string;
@@ -56,7 +56,7 @@ export interface Logger {
     debug(message: string, detail?: Record<string, unknown>): void;
 }
 export declare class ReleaseService {
-    private readonly config;
+    private config;
     private readonly git;
     private readonly logger;
     private readonly store;
@@ -68,6 +68,32 @@ export declare class ReleaseService {
     private initPromise;
     private initError;
     constructor(config: ResolvedConfig, git: GitExecutor, logger?: Logger);
+    /**
+     * 运行时改配置：界面上保存设置后调用，不需要重启 dsh。
+     *
+     * 只有真正影响缓存的字段变化时才清缓存——GitLab 连接变了要重建适配器
+     * （旧令牌的身份画像会一起作废），扫描参数变了要重新扫目录。
+     */
+    reconfigure(patch: Partial<ResolvedConfig>): void;
+    /** 当前生效配置。含明文令牌，只允许宿主内部使用，对外必须先脱敏。 */
+    get settings(): Readonly<ResolvedConfig>;
+    /** 配置是否已经能让 GitLab 相关功能跑起来 */
+    get gitlabReady(): boolean;
+    /**
+     * 探测 GitLab 连接，可以带上还没保存的新值——设置页「测试连接」用。
+     * 不复用 this.adapter：避免把未保存的凭据写进当前实例的缓存。
+     */
+    testGitLab(override?: {
+        baseUrl?: string;
+        token?: string;
+    }): Promise<{
+        ok: boolean;
+        ms: number;
+        account?: string;
+        version?: string;
+        error?: string;
+        note?: string;
+    }>;
     /**
      * 首次使用时才读盘与扫描：插件加载本身不做 I/O，dsh 启动不会因为
      * 扫描一堆仓库而变慢；初始化失败也只会影响工具调用，不会拖垮整个插件树。
@@ -87,6 +113,8 @@ export declare class ReleaseService {
     planMerge(input: PlanInput): Promise<MergePlan>;
     private checkProject;
     applyPlan(input: ApplyInput): Promise<ApplyResult>;
+    /** 任务中心：最近的执行记录（新的在前） */
+    get tasks(): TaskRecord[];
     private executeItem;
     private mergeWithGit;
     private writeWithMr;

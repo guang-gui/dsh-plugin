@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 const MAX_PLANS = 30;
+const MAX_TASKS = 50;
 function readJson(file) {
     try {
         if (!existsSync(file))
@@ -28,6 +29,7 @@ export class JsonStore {
     projects = [];
     savedAt = '';
     plans = new Map();
+    tasks = [];
     constructor(dir) {
         this.dir = dir;
     }
@@ -36,6 +38,9 @@ export class JsonStore {
     }
     get plansFile() {
         return join(this.dir, 'plans.json');
+    }
+    get tasksFile() {
+        return join(this.dir, 'tasks.json');
     }
     load() {
         const p = readJson(this.projectsFile);
@@ -49,6 +54,10 @@ export class JsonStore {
                 this.plans.set(plan.id, plan);
         }
         this.prunePlans();
+        const tasks = readJson(this.tasksFile);
+        if (Array.isArray(tasks?.tasks)) {
+            this.tasks = tasks.tasks.filter((t) => t?.id).slice(0, MAX_TASKS);
+        }
     }
     get list() {
         return this.projects;
@@ -81,6 +90,17 @@ export class JsonStore {
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
             .slice(0, MAX_PLANS);
         this.plans = new Map(alive.map((p) => [p.id, p]));
+    }
+    /* ------------------------------------------------------------------ */
+    /* 任务中心                                                            */
+    /* ------------------------------------------------------------------ */
+    /** 最近的执行记录，新的在前 */
+    get taskList() {
+        return this.tasks;
+    }
+    addTask(task) {
+        this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)].slice(0, MAX_TASKS);
+        writeJson(this.tasksFile, { tasks: this.tasks });
     }
 }
 //# sourceMappingURL=store.js.map

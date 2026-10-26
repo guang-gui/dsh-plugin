@@ -6,9 +6,9 @@ const MAX_BODY_BYTES = 256 * 1024;
 /**
  * 把发版控制台挂到当前 profile 的 web 服务上。
  * @param ctx 插件上下文
- * @param service 与工具共用的发版服务
+ * @param deps 与工具共用的发版服务 + 设置桥
  */
-export function registerWebUi(ctx, service) {
+export function registerWebUi(ctx, deps) {
     ctx.inject(['webServer'], (webCtx) => {
         const server = webCtx.get('webServer');
         if (!server)
@@ -17,7 +17,7 @@ export function registerWebUi(ctx, service) {
         webCtx.effect(() => server.register({
             kind: 'prefix',
             path: WEB_UI_PATH,
-            handler: (req, res) => handle(req, res, service),
+            handler: (req, res) => handle(req, res, deps),
         }));
         console.info(`[release] 发版控制台已挂载：${WEB_UI_PATH}`);
     });
@@ -25,7 +25,8 @@ export function registerWebUi(ctx, service) {
 /* ------------------------------------------------------------------ */
 /* 路由分发                                                            */
 /* ------------------------------------------------------------------ */
-async function handle(req, res, service) {
+async function handle(req, res, deps) {
+    const { service, settings } = deps;
     try {
         if (!isLoopbackHost(req.headers.host)) {
             json(res, 403, { error: '发版控制台只允许从本机访问' });
@@ -38,6 +39,32 @@ async function handle(req, res, service) {
             sendHtml(res, WEB_PAGE);
             return;
         }
+        /* ---- 设置 ---- */
+        if (method === 'GET' && path === `${WEB_UI_PATH}/api/settings`) {
+            json(res, 200, settings.view());
+            return;
+        }
+        if (method === 'POST' && path === `${WEB_UI_PATH}/api/settings`) {
+            const body = await readJson(req);
+            json(res, 200, await settings.save(body));
+            return;
+        }
+        if (method === 'POST' && path === `${WEB_UI_PATH}/api/settings/test`) {
+            const body = await readJson(req);
+            const baseUrl = text(body.gitlabBaseUrl);
+            const token = text(body.gitlabToken);
+            json(res, 200, await settings.test({
+                ...(baseUrl ? { baseUrl } : {}),
+                // 空令牌表示「用已保存的那把」，不覆盖
+                ...(token ? { token } : {}),
+            }));
+            return;
+        }
+        if (method === 'GET' && path === `${WEB_UI_PATH}/api/settings/dirs`) {
+            json(res, 200, settings.browse(url.searchParams.get('path') ?? ''));
+            return;
+        }
+        /* ---- 仓库与分支 ---- */
         if (method === 'GET' && path === `${WEB_UI_PATH}/api/projects`) {
             await listProjects(res, service, url.searchParams.get('refresh') === '1');
             return;
@@ -51,6 +78,17 @@ async function handle(req, res, service) {
             json(res, 200, await service.refreshMrs(planId));
             return;
         }
+        /* ---- 任务中心 ---- */
+        if (method === 'GET' && path === `${WEB_UI_PATH}/api/tasks`) {
+            await service.ready();
+            const tasks = service.tasks;
+            json(res, 200, {
+                total: tasks.length,
+                tasks,
+            });
+            return;
+        }
+        /* ---- 预检与执行 ---- */
         if (method === 'POST' && path === `${WEB_UI_PATH}/api/check`) {
             await runCheck(req, res, service);
             return;

@@ -68,6 +68,51 @@ export class ReleaseService {
     /* 生命周期                                                            */
     /* ------------------------------------------------------------------ */
     /**
+     * 运行时改配置：界面上保存设置后调用，不需要重启 dsh。
+     *
+     * 只有真正影响缓存的字段变化时才清缓存——GitLab 连接变了要重建适配器
+     * （旧令牌的身份画像会一起作废），扫描参数变了要重新扫目录。
+     */
+    reconfigure(patch) {
+        const prev = this.config;
+        this.config = { ...prev, ...patch };
+        if (this.config.gitlabBaseUrl !== prev.gitlabBaseUrl || this.config.gitlabToken !== prev.gitlabToken) {
+            this.adapter = null;
+        }
+        const rootsChanged = this.config.roots.join('\u0000') !== prev.roots.join('\u0000') || this.config.scanDepth !== prev.scanDepth;
+        if (rootsChanged) {
+            this.scanned = false;
+            this.rangeCache.clear();
+            this.treeCache.clear();
+        }
+    }
+    /** 当前生效配置。含明文令牌，只允许宿主内部使用，对外必须先脱敏。 */
+    get settings() {
+        return this.config;
+    }
+    /** 配置是否已经能让 GitLab 相关功能跑起来 */
+    get gitlabReady() {
+        return Boolean(this.config.gitlabBaseUrl && this.config.gitlabToken);
+    }
+    /**
+     * 探测 GitLab 连接，可以带上还没保存的新值——设置页「测试连接」用。
+     * 不复用 this.adapter：避免把未保存的凭据写进当前实例的缓存。
+     */
+    async testGitLab(override) {
+        const baseUrl = (override?.baseUrl ?? this.config.gitlabBaseUrl).trim().replace(/\/+$/, '');
+        const token = (override?.token ?? this.config.gitlabToken).trim();
+        if (!baseUrl)
+            return { ok: false, ms: 0, error: '未填写 GitLab 地址' };
+        if (!token)
+            return { ok: false, ms: 0, error: '未填写令牌' };
+        try {
+            return await new GitLabAdapter({ baseUrl, token }).testConnection();
+        }
+        catch (e) {
+            return { ok: false, ms: 0, error: e instanceof Error ? e.message : String(e) };
+        }
+    }
+    /**
      * 首次使用时才读盘与扫描：插件加载本身不做 I/O，dsh 启动不会因为
      * 扫描一堆仓库而变慢；初始化失败也只会影响工具调用，不会拖垮整个插件树。
      */
@@ -639,15 +684,41 @@ export class ReleaseService {
             });
         }
         const succeeded = results.filter((r) => r.ok).length;
+        const failed = results.filter((r) => r.kind === 'failed').length;
+        const durationMs = Date.now() - started;
+        // 落到任务中心：失败也算记录，否则「哪个仓库没发出去」事后无从查起
+        this.store.addTask({
+            id: `t_${started.toString(36)}`,
+            planId: plan.id,
+            mode: plan.mode,
+            sourceBranch: plan.sourceBranch,
+            targetBranch: plan.targetBranch,
+            mergeStrategy: plan.mergeStrategy,
+            deleteSourceBranch: plan.deleteSourceBranch,
+            title: plan.title,
+            startedAt: new Date(started).toISOString(),
+            finishedAt: new Date().toISOString(),
+            durationMs,
+            total: plan.items.length,
+            succeeded,
+            failed,
+            skipped: skipped.length,
+            status: failed === 0 ? 'success' : succeeded > 0 ? 'partial' : 'failed',
+            results,
+        });
         return {
             planId: plan.id,
             mode: plan.mode,
             results,
             succeeded,
-            failed: results.filter((r) => r.kind === 'failed').length,
+            failed,
             skipped: skipped.length,
-            durationMs: Date.now() - started,
+            durationMs,
         };
+    }
+    /** 任务中心：最近的执行记录（新的在前） */
+    get tasks() {
+        return this.store.taskList;
     }
     async executeItem(plan, item, signal) {
         const project = this.store.list.find((p) => p.id === item.projectId);

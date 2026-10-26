@@ -130,3 +130,32 @@ export interface ApplyResult {
   skipped: number;
   durationMs: number;
 }
+
+export type TaskStatus = 'success' | 'partial' | 'failed';
+
+/**
+ * 任务中心里的一条执行记录。
+ *
+ * 只记录「真正动过远端」的执行，不记预检——预检是只读的，数量多且没有留存价值。
+ * 保留最近的若干条，用来回答「上周那次发版到底哪个仓库失败了」。
+ */
+export interface TaskRecord {
+  id: string;
+  planId: string;
+  mode: PlanMode;
+  sourceBranch: string;
+  targetBranch: string;
+  mergeStrategy: MergeStrategy;
+  deleteSourceBranch: boolean;
+  title: string | null;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  /** 计划里涉及的仓库总数（含跳过） */
+  total: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  status: TaskStatus;
+  results: ItemResult[];
+}
