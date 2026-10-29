@@ -19,6 +19,7 @@ interface GitLabMr {
   merge_status?: string;
   detailed_merge_status?: string;
   has_conflicts?: boolean;
+  merge_error?: string | null;
   head_pipeline?: { status?: string } | null;
   pipeline?: { status?: string } | null;
   merge_commit_sha?: string | null;
@@ -141,6 +142,31 @@ export class GitLabAdapter {
     }
   }
 
+  /** Read the complete branch list once; never send a request for each keystroke. */
+  async listBranches(project: number | string): Promise<Array<{ name: string; sha: string }>> {
+    const refs: Array<{ name: string; sha: string }> = [];
+    for (let page = 1; ; page++) {
+      const batch = await this.api<GitLabBranch[]>(
+        `/projects/${this.projectPath(project)}/repository/branches?per_page=100&page=${page}`,
+      );
+      refs.push(...batch.map((branch) => ({ name: branch.name, sha: branch.commit.id })));
+      if (batch.length < 100) return refs;
+      if (page >= 1000) throw new Error('分支数量超过 100000，请缩小仓库范围');
+    }
+  }
+
+  /** Compare the pinned commits without fetching objects into the user's checkout. */
+  async countAhead(project: number | string, baseSha: string, headSha: string): Promise<number> {
+    const query = new URLSearchParams({ from: baseSha, to: headSha, straight: 'true' });
+    const data = await this.api<{ commits?: unknown; compare_timeout?: boolean }>(
+      `/projects/${this.projectPath(project)}/repository/compare?${query}`,
+    );
+    if (data.compare_timeout || !Array.isArray(data.commits)) {
+      throw new Error('GitLab 未返回完整的提交比较结果');
+    }
+    return data.commits.length;
+  }
+
   async listOpenMrs(project: number | string, source: string, target: string): Promise<MrRef[]> {
     const data = await this.api<GitLabMr[]>(
       `/projects/${this.projectPath(project)}/merge_requests?state=opened&source_branch=${encodeURIComponent(
@@ -150,8 +176,23 @@ export class GitLabAdapter {
     return data.map((m) => this.toMrRef(m));
   }
 
-  async getMr(project: number | string, iid: number): Promise<MrRef> {
-    return this.toMrRef(await this.api<GitLabMr>(`/projects/${this.projectPath(project)}/merge_requests/${iid}`));
+  async getMr(project: number | string, iid: number, timeoutMs?: number): Promise<MrRef> {
+    return this.toMrRef(await this.api<GitLabMr>(`/projects/${this.projectPath(project)}/merge_requests/${iid}`, { timeoutMs }));
+  }
+
+  /** GitLab prepares a new MR asynchronously; only poll transient states, with a total deadline. */
+  async waitForMergeable(project: number | string, initial: MrRef, timeoutMs = 20_000): Promise<MrRef> {
+    const deadline = Date.now() + timeoutMs;
+    let mr = initial;
+    while (mr.state === 'opened' && mr.mergeStatus === 'checking') {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      await new Promise<void>((resolve) => setTimeout(resolve, Math.min(1000, remaining)));
+      const requestTime = deadline - Date.now();
+      if (requestTime <= 0) break;
+      mr = await this.getMr(project, mr.iid, requestTime);
+    }
+    return mr;
   }
 
   async createMr(
@@ -196,14 +237,31 @@ export class GitLabAdapter {
       m.state === 'opened' || m.state === 'merged' || m.state === 'closed' || m.state === 'locked'
         ? (m.state as MrRef['state'])
         : 'unknown';
-    const raw = m.detailed_merge_status ?? m.merge_status ?? '';
+    const raw = m.detailed_merge_status || m.merge_status || '';
+    const blockers: Record<string, string> = {
+      discussions_not_resolved: '仍有未解决的讨论',
+      draft_status: 'MR 仍为草稿',
+      jira_association_missing: 'MR 标题或说明缺少关联的 Jira 问题',
+      merge_request_blocked: '被其他 MR 阻塞',
+      merge_time: '尚未到允许合并的时间',
+      need_rebase: '源分支需要先 rebase',
+      not_open: 'MR 不是打开状态',
+      requested_changes: '审阅者要求修改',
+      security_policy_pipeline_check: '安全策略要求流水线通过',
+      security_policy_violations: '未满足安全策略',
+      status_checks_must_pass: '外部状态检查未通过',
+      locked_paths: '存在被其他用户锁定的路径',
+      locked_lfs_files: '存在被锁定的 LFS 文件',
+      title_regex: 'MR 标题不符合项目规则',
+      commits_status: '源分支不存在或没有可合并提交',
+    };
     let mergeStatus: MrRef['mergeStatus'] = 'unknown';
     if (m.has_conflicts || raw === 'conflict' || raw === 'cannot_be_merged') mergeStatus = 'conflict';
     else if (raw === 'mergeable' || raw === 'can_be_merged') mergeStatus = 'mergeable';
     else if (raw === 'not_approved') mergeStatus = 'not-approved';
     else if (raw === 'ci_must_pass' || raw === 'ci_still_running') mergeStatus = 'ci-failed';
-    else if (raw === 'checking' || raw === 'unchecked' || raw === '') mergeStatus = 'checking';
-    else if (raw) mergeStatus = 'blocked';
+    else if (['checking', 'unchecked', 'preparing', 'approvals_syncing', 'cannot_be_merged_recheck', ''].includes(raw)) mergeStatus = 'checking';
+    else if (blockers[raw]) mergeStatus = 'blocked';
 
     const pipelineRaw = m.head_pipeline?.status ?? m.pipeline?.status ?? 'none';
     const pipeline: MrRef['pipeline'] =
@@ -217,10 +275,12 @@ export class GitLabAdapter {
       conflict: '目标分支与源分支存在冲突',
       'not-approved': '审批未满足',
       'ci-failed': '流水线未通过',
-      blocked: 'GitLab 拒绝合并（分支保护或讨论未解决）',
+      blocked: blockers[raw],
       checking: 'GitLab 正在计算可合并状态',
       unknown: '无法获取合并状态',
     };
+    const detail = mergeStatus === 'mergeable' ? undefined
+      : `${detailMap[mergeStatus]}${raw ? `（${raw}）` : ''}${m.merge_error ? `；${m.merge_error}` : ''}`;
 
     return {
       iid: m.iid,
@@ -231,7 +291,8 @@ export class GitLabAdapter {
       targetBranch: m.target_branch,
       pipeline,
       mergeStatus,
-      ...(detailMap[mergeStatus] ? { detail: detailMap[mergeStatus] } : {}),
+      rawMergeStatus: raw,
+      ...(detail ? { detail } : {}),
       mergeCommitSha: m.merge_commit_sha ?? m.squash_commit_sha ?? null,
     };
   }

@@ -243,9 +243,9 @@ export function registerTools(ctx: Context, service: ReleaseService): void {
       description:
         '跨所有仓库按关键词搜索远端分支，返回「哪个仓库有这条分支」以及对应提交。'
         + '用于确认发布分支/特性分支是否真实存在，避免把不存在或拼错的分支名带进预检。'
-        + '关键词留空则返回各仓库的主干分支（master/main/develop 等）。',
+        + '关键词支持模糊匹配；留空列出候选，主干分支（master/main/develop 等）优先。与页面共用分支缓存。',
       parameters: {
-        keyword: { type: 'string', description: '分支名关键词，支持片段匹配，例如 PROJ-123' },
+        keyword: { type: 'string', description: '分支名关键词，支持片段、多个关键词与不连续字符匹配，例如 PROJ-123' },
         projects: { type: 'array', items: { type: 'string' }, description: '只在这些仓库里找（id、名称或 GitLab 路径）' },
       },
       output: {
@@ -287,7 +287,7 @@ export function registerTools(ctx: Context, service: ReleaseService): void {
       },
       presentCall: (args) => ({
         card: 'generic',
-        title: args.keyword ? `搜索分支 ${args.keyword}` : '列出主干分支',
+        title: args.keyword ? `搜索分支 ${args.keyword}` : '列出候选分支',
         kind: 'search',
         rawInput: args.keyword,
       }),
@@ -314,7 +314,7 @@ export function registerTools(ctx: Context, service: ReleaseService): void {
         projects: { type: 'array', items: { type: 'string' }, description: '只检查这些仓库（id、名称或 GitLab 路径），留空=全部启用仓库' },
         title: { type: 'string', description: 'MR 标题 / 合并提交信息。留空则按分支名自动生成' },
         description: { type: 'string', description: 'MR 说明 / 合并提交正文' },
-        refresh: { type: 'boolean', description: '忽略分支 SHA 缓存，强制重新问远端' },
+        refresh: { type: 'boolean', description: '默认 true，每次核对远端最新提交；显式 false 才复用分支 SHA 缓存' },
       },
       output: {
         schema: {

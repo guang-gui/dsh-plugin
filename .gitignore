@@ -11,5 +11,7 @@ Thumbs.db
 .chrome-prof/
 .cdp-*.mjs
 shot*.png
+output/playwright/
+.playwright-mcp/
 
 # 注意：lib/ 是构建产物，但需要随仓库分发（DSH 直接加载），不要忽略

@@ -12,19 +12,25 @@
 
 ### 侧边栏面板（原生）
 
-插件带浏览器半（`lib/client.js`），安装后在侧边栏出现「发版」入口，点击打开整页：
+插件带浏览器半（`lib/client.js`），Harness 侧边栏只出现一个「发版」入口；页面顶部「设置」和页内左侧「发版设置」均可打开设置：
 
 - 组件通过 `sidebar.panellist` + `main` 两个 slot 注册，面板 id 与 main 的 key 都是 `release`
 - 样式使用 DSH 的设计变量（`--dsw-alias-*`），自动跟随浅色/深色主题
 - 页面数据来自宿主接口 `/release-ui/api/*`，与对话工具调用同一份 `ReleaseService`
+- 源分支和目标分支均支持模糊下拉：大小写无关、子串、多个关键词、不连续字符；可鼠标选择或使用 ↑ ↓ / Enter / Esc
+- 先读本地跟踪分支，随后异步更新远端；同一仓库共用一次读取，输入时只在浏览器中筛选，不逐字查询远端
+- 配置了 GitLab 连接时使用令牌通过 REST API 分页读取同实例仓库的分支；其他仓库使用 Git 凭据。失败时保留本地候选并提示，候选不代表远端分支一定存在，预检仍独立核验
+- 候选显示分支覆盖的仓库数，随仓库选择过滤；清空选择后禁止预检，修改发版参数会使旧计划失效
+- 预检期间可以修改模式、分支和仓库；修改会取消当前页面的预检请求并丢弃旧结果，也可点击「取消预检」。请求超过 2 分钟会提示重试，实际执行期间锁定发版参数
+- 预检结果优先显示已确认存在源分支的仓库，查询状态未知的居中，确认缺少源分支的放最后；同组保持原顺序
 
-### 独立网页（主力界面）
+### 独立网页
 
 ```
 http://127.0.0.1:<宿主端口>/release-ui
 ```
 
-- 单文件 HTML（内嵌样式与脚本），不依赖前端构建
+- 与 Harness 面板共用同一套 React 组件；`npm run build` 同时生成 `lib/client.js` 和独立网页的 `lib/standalone.js`
 - 命名路由优先于静态资源鉴权，页面不需要 DSH token，但只接受本机（loopback）访问
 - 自带**设置页**与**任务中心**，日常发版完全不用碰 YAML
 - headless 模式下没有 web 服务，页面与面板都不可用，工具照常工作
@@ -36,6 +42,7 @@ http://127.0.0.1:<宿主端口>/release-ui
 | 设置项 | 说明 |
 |---|---|
 | GitLab 地址 | 留空则只能本地合并，不能建 MR |
+| 账号 | 可填写显示名称；测试连接成功后用 GitLab 返回的真实账号更新，认证仍使用令牌 |
 | 令牌 | 留空 = 沿用已保存的 / 环境变量；接口只回传末四位 |
 | 扫描目录 | 可逐级浏览点选，标出哪些是 Git 仓库、哪些已选 |
 | 扫描深度 / 默认目标分支 / 并发数 / 缓存有效期 / 合并策略 / 删除源分支 | 同 YAML 里的字段 |
@@ -62,6 +69,7 @@ http://127.0.0.1:<宿主端口>/release-ui
 | 浏览目录 | `GET /release-ui/api/settings/dirs?path=` | — |
 | 加载/重新扫描仓库 | `GET /release-ui/api/projects` | `release_projects` |
 | 搜分支 | `GET /release-ui/api/branches` | `release_branches` |
+| 下拉候选（本地优先、异步更新） | `GET /release-ui/api/branch-options`（可带 `keyword`、重复 `project`、`refresh=1`） | — |
 | 预检 | `POST /release-ui/api/check` | `release_check` |
 | 确认执行 | `POST /release-ui/api/apply` | `release_apply` |
 | MR 状态 | `GET /release-ui/api/mrs` | `release_mrs` |
@@ -69,12 +77,16 @@ http://127.0.0.1:<宿主端口>/release-ui
 
 ## 它解决什么问题
 
+插件入口参考 [DeepSeek Harness 官方客户端 slot 文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/slots.md)。设置保存无需重启；开发时若宿主仍缓存旧版 JavaScript 模块，构建后需要重新启动 Harness 才能加载新版代码。
+
 一次发版往往要动十几个仓库：同一个 `release/20261022` 分支，要合到各自的 `master`。手工点一遍要半小时，还容易漏。
 
 插件提供的能力：
 
 - **预检**：每个仓库比一次源分支和目标分支，算出待合并提交数、有没有冲突、有没有已存在的 MR、有没有 API 权限，并把不能执行的原因直接说出来
+- 每次普通预检都会核对远端最新提交；创建 MR 时若本地缺少最新对象，使用 GitLab 按固定 SHA 比较，查询失败保留“未知”，不当作“无变化”
 - **执行**：按预检结果建 MR 或合并，执行前重新核对远端 SHA，分支变了就要求重新预检
+- 新建 MR 后先读取最新状态；`preparing`、`approvals_syncing` 等准备状态最多等待 20 秒，只有确认可合并才调用合并接口。未就绪或被拦截时记录具体状态与 MR 链接
 - **安全边界**：预检只读；执行必须带上预检产出的 `planId` + `planHash`，计划 10 分钟过期
 
 ## 安装
@@ -137,7 +149,7 @@ npm run build        # tsc -> lib/
 | `gitlab.tokenEnv` | `GITLAB_TOKEN` | 从哪个环境变量读令牌 |
 | `projects` | `[]` | 显式补充扫描不到的项目，或覆盖默认目标分支/启用状态 |
 | `concurrency` | `8` | 预检并发；自建 GitLab 上 8 是拐点，再高反而更慢 |
-| `headCacheTtlSec` | `300` | 分支 SHA 缓存有效期，0 表示每次重新问远端 |
+| `headCacheTtlSec` | `300` | 分支缓存有效期；普通预检始终核对最新，只有显式 `refresh=false` 的工具/API 调用才复用 SHA 缓存 |
 | `mergeStrategy` | `merge` | `merge` / `ff-only` / `no-ff`，只影响 Git 直接合并 |
 | `deleteSourceBranch` | `false` | 合并后是否删源分支 |
 | `dataDir` | `$DSH_HOME/release-plugin` | 缓存、计划、bare 仓库的存放位置 |
@@ -198,7 +210,7 @@ setx GITLAB_TOKEN "glpat-xxxx"        # Windows，重开终端生效
 
 ## 性能
 
-21 个仓库，自建 GitLab：
+旧实现中，21 个仓库通过 Git 逐个查询远端曾有以下耗时（历史数据，不代表当前实现）：
 
 | 场景 | 耗时 |
 |---|---|
@@ -207,10 +219,11 @@ setx GITLAB_TOKEN "glpat-xxxx"        # Windows，重开终端生效
 | 5 分钟内重复预检（分支 SHA 缓存命中） | 5.8 秒 |
 | 只预检 1 个仓库 | 7.5 秒 |
 
-预检的瓶颈是 `ls-remote`：自建 GitLab 单次 4–8 秒，且没有批量接口（GraphQL 该版本不支持按分支查询）。所以：
+当前实现将候选搜索与预检分开：
 
 - **先用 `release_branches` 找到分支在哪几个仓库**，再用 `projects` 只预检这几个 —— 这是最快的路径
-- 分支 SHA 落盘缓存，重启后仍然有效（`headCacheTtlSec` 控制有效期）
+- 每次点击「预检」都核对最新远端 SHA；同一 GitLab 实例优先并行调用分支 API，失败后回退到 Git 查询，不会因 5 分钟旧缓存把刚推送的提交判为无变化
+- 下拉候选仍使用缓存和本地过滤，输入不受远端查询影响；只有工具/API 显式传入 `refresh=false` 时才使用持久 SHA 缓存
 - `create-mr` 完全不下载代码，也不做冲突预演
 
 ## 与旧版 Electron 应用的关系

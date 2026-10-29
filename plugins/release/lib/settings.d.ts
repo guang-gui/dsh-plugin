@@ -3,6 +3,8 @@ export declare const SETTINGS_FILE = "settings.json";
 export interface PluginSettings {
     /** GitLab 实例地址，例如 https://git.example.com；空表示未配置 */
     gitlabBaseUrl: string;
+    /** Account label; authentication always uses the personal access token. */
+    gitlabAccount?: string;
     /** 个人访问令牌（scope: api）；空表示改用环境变量 */
     gitlabToken: string;
     /** 令牌所在环境变量名 */

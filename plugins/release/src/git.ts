@@ -270,7 +270,8 @@ export class GitExecutor {
   async countRange(cacheDir: string, from: string, to: string): Promise<number> {
     const out = await this.must(['-C', cacheDir, 'rev-list', '--count', `${from}..${to}`], 60_000);
     const n = Number(out.trim());
-    return Number.isFinite(n) ? n : 0;
+    if (!/^\d+$/.test(out.trim()) || !Number.isSafeInteger(n)) throw new GitError('UNKNOWN', 'Git 返回了无效的提交数量');
+    return n;
   }
 
   /** 一次遍历同时算出领先/落后提交数，比两次 countRange 省一半时间 */
@@ -279,9 +280,12 @@ export class GitExecutor {
     const [left, right] = out.trim().split(/\s+/);
     const behind = Number(left);
     const ahead = Number(right);
+    if (!/^\d+\s+\d+$/.test(out.trim()) || !Number.isSafeInteger(ahead) || !Number.isSafeInteger(behind)) {
+      throw new GitError('UNKNOWN', 'Git 返回了无效的提交差异，无法判定是否有变化');
+    }
     return {
-      ahead: Number.isFinite(ahead) ? ahead : 0,
-      behind: Number.isFinite(behind) ? behind : 0,
+      ahead,
+      behind,
     };
   }
 

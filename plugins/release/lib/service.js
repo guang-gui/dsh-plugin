@@ -14,16 +14,8 @@ import { HeadCacheStore } from './head-cache.js';
 import { HttpError } from './http.js';
 import { projectId, scanRoots } from './scanner.js';
 import { JsonStore } from './store.js';
+import { BranchCatalog } from './branch-catalog.js';
 const NULL_LOGGER = { info: () => { }, warn: () => { }, debug: () => { } };
-/** 空关键词查分支时只问这几条主干，避免拉回上千个 ref */
-const TRUNK_REFS = [
-    'refs/heads/master',
-    'refs/heads/main',
-    'refs/heads/develop',
-    'refs/heads/dev',
-    'refs/heads/pre',
-    'refs/heads/prod',
-];
 /** 并发上限内跑完所有任务，保持结果顺序 */
 async function mapLimit(items, limit, fn) {
     const results = new Array(items.length);
@@ -57,11 +49,13 @@ export class ReleaseService {
     treeCache = new Map();
     initPromise = null;
     initError = null;
+    branches;
     constructor(config, git, logger = NULL_LOGGER) {
         this.config = config;
         this.git = git;
         this.logger = logger;
         this.store = new JsonStore(config.dataDir);
+        this.branches = this.createBranchCatalog();
         this.heads = new HeadCacheStore(join(config.dataDir, 'head-cache.json'), (m, d) => this.logger.warn(m, d));
     }
     /* ------------------------------------------------------------------ */
@@ -78,9 +72,11 @@ export class ReleaseService {
         this.config = { ...prev, ...patch };
         if (this.config.gitlabBaseUrl !== prev.gitlabBaseUrl || this.config.gitlabToken !== prev.gitlabToken) {
             this.adapter = null;
+            this.branches = this.createBranchCatalog();
         }
         const rootsChanged = this.config.roots.join('\u0000') !== prev.roots.join('\u0000') || this.config.scanDepth !== prev.scanDepth;
         if (rootsChanged) {
+            this.branches = this.createBranchCatalog();
             this.scanned = false;
             this.rangeCache.clear();
             this.treeCache.clear();
@@ -130,7 +126,7 @@ export class ReleaseService {
     async bootstrap() {
         this.store.load();
         this.heads.load();
-        if (!this.store.list.length && this.config.roots.length) {
+        if (!this.store.list.length && (this.config.roots.length || this.config.projects.length)) {
             await this.scanProjects();
         }
     }
@@ -203,6 +199,7 @@ export class ReleaseService {
         }
         const list = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
         this.store.replaceProjects(list);
+        this.branches = this.createBranchCatalog();
         this.scanned = true;
         this.logger.info('项目清单已更新', { total: list.length, roots: this.config.roots.length });
         return list;
@@ -225,36 +222,33 @@ export class ReleaseService {
     /* ------------------------------------------------------------------ */
     /* 分支                                                                */
     /* ------------------------------------------------------------------ */
-    /** 跨仓库按关键词查分支。关键词为空时返回各仓库的主干分支，便于选目标分支。 */
+    async branchOptions(keyword = '', projectIds, refresh = false) {
+        await this.ready();
+        const catalog = this.branches;
+        // Load the full enabled set once, so changing the selection never loses local candidates.
+        await catalog.view(this.selectProjects(), this.config.concurrency, this.config.headCacheTtlSec, refresh);
+        return catalog.snapshot(this.selectProjects(projectIds), keyword);
+    }
+    createBranchCatalog() {
+        // Capture the current adapter, so reconfiguration cannot mix two identities in an old request.
+        const adapter = this.adapterFor();
+        const baseUrl = this.config.gitlabBaseUrl;
+        return new BranchCatalog(this.git, async (project) => {
+            const remote = parseRemoteUrl(project.remoteUrl);
+            if (adapter && remote?.host === new URL(baseUrl).hostname.toLowerCase()) {
+                return adapter.listBranches(project.gitlabPath);
+            }
+            const dir = await this.repoDirFor(project, false);
+            return this.git.lsRemoteHeads(dir ?? undefined, dir ? 'origin' : project.remoteUrl);
+        });
+    }
+    /** Tools share the same fuzzy catalog as the UI; cached searches do not query the network again. */
     async findBranches(keyword, projectIds, limit = 200) {
         await this.ready();
-        const projects = this.selectProjects(projectIds);
-        const trimmed = keyword.trim();
-        const safe = trimmed.replace(/[*?[\]]/g, '');
-        // 空关键词只问主干分支：全量 ls-remote 在大仓库上会有上千行
-        const pattern = safe ? `refs/heads/*${safe}*` : TRUNK_REFS;
-        const perProject = await mapLimit(projects, this.config.concurrency, async (project) => {
-            try {
-                const dir = await this.repoDirFor(project, false);
-                const refs = await this.git.lsRemoteHeads(dir ?? undefined, dir ? 'origin' : project.remoteUrl, pattern);
-                const lower = safe.toLowerCase();
-                return refs
-                    .filter((r) => (safe ? r.name.toLowerCase().includes(lower) : isTrunk(r.name)))
-                    .map((r) => ({
-                    projectId: project.id,
-                    project: project.name,
-                    namespace: project.namespace,
-                    branch: r.name,
-                    sha: r.sha,
-                    gitlabPath: project.gitlabPath,
-                }));
-            }
-            catch (e) {
-                this.logger.debug('查询分支失败', { project: project.name, error: errorMessage(e) });
-                return [];
-            }
-        });
-        return perProject.flat().slice(0, limit);
+        const catalog = this.branches;
+        await catalog.view(this.selectProjects(), this.config.concurrency, this.config.headCacheTtlSec);
+        await catalog.wait();
+        return catalog.matches(this.selectProjects(projectIds), keyword.trim(), limit);
     }
     /* ------------------------------------------------------------------ */
     /* 预检                                                                */
@@ -275,7 +269,7 @@ export class ReleaseService {
                 ? '没有匹配的启用项目，请先检查 roots 配置或项目是否被停用'
                 : '还没有任何仓库：请在插件配置里填 roots（本地仓库根目录）或 projects');
         }
-        const items = await mapLimit(projects, this.config.concurrency, (project, index) => this.checkProject(project, mode, source, globalTarget, index, Boolean(input.refresh), input.signal));
+        const items = await mapLimit(projects, this.config.concurrency, (project, index) => this.checkProject(project, mode, source, globalTarget, index, input.refresh !== false, input.signal));
         const mergeStrategy = input.mergeStrategy ?? this.config.mergeStrategy;
         const deleteSourceBranch = input.deleteSourceBranch ?? this.config.deleteSourceBranch;
         const title = (input.title ?? '').trim() || defaultTitle(mode, source, globalTarget);
@@ -335,6 +329,13 @@ export class ReleaseService {
         let sourceError = null;
         let targetError = null;
         const adapter = this.adapterFor();
+        const remoteHost = parseRemoteUrl(project.remoteUrl)?.host;
+        let instanceHost = '';
+        try {
+            instanceHost = new URL(this.config.gitlabBaseUrl).hostname.toLowerCase();
+        }
+        catch { /* Git-only configuration */ }
+        const sameGitLab = adapter !== null && remoteHost === instanceHost;
         const needsApi = mode !== 'merge-git';
         // 创建 MR 不需要本地对象；只有要算冲突/合并才需要把仓库落到本地
         const dir = await this.repoDirFor(project, mode !== 'create-mr').catch((e) => {
@@ -359,11 +360,24 @@ export class ReleaseService {
             cachedAgeMs = Math.max(now - sCached.at, now - tCached.at);
             confirmed = true;
         }
-        // 2) 未命中：一次 ls-remote 拿两个分支的最新 SHA（一次网络往返，且能判定分支是否存在）
+        // 2) 默认每次预检核对最新 SHA；候选列表缓存不能作为「无变化」的依据。
+        // 同一 GitLab 实例优先并行读取两个分支，避免每个项目启动一次慢速 Git 连接。
         if (!confirmed) {
             let refs = null;
+            if (adapter && sameGitLab) {
+                try {
+                    const branches = await Promise.all([
+                        adapter.getBranch(project.gitlabPath, sourceBranch),
+                        adapter.getBranch(project.gitlabPath, targetBranch),
+                    ]);
+                    refs = branches.filter((branch) => branch !== null);
+                }
+                catch (e) {
+                    this.logger.debug('分支 API 查询失败，改用 Git 核对', { project: project.name, error: errorMessage(e) });
+                }
+            }
             try {
-                refs = await this.git.lsRemoteHeads(dir ?? undefined, dir ? 'origin' : project.remoteUrl, [sourceRef, targetRef]);
+                refs ??= await this.git.lsRemoteHeads(dir ?? undefined, dir ? 'origin' : project.remoteUrl, [sourceRef, targetRef]);
             }
             catch (e) {
                 sourceError = errorMessage(e);
@@ -468,8 +482,16 @@ export class ReleaseService {
                 }
             }
         }
+        if (ahead === null && mode === 'create-mr' && sourceSha && targetSha && adapter && sameGitLab) {
+            try {
+                ahead = await adapter.countAhead(project.gitlabPath, targetSha, sourceSha);
+            }
+            catch (e) {
+                this.logger.debug('远端提交比较失败', { project: project.name, error: errorMessage(e) });
+            }
+        }
         if (ahead === null && mode === 'create-mr' && sourceSha && targetSha) {
-            warnings.push('本地缺少这两个分支的对象，待合并提交数未计算（不影响创建 MR）');
+            warnings.push('待合并提交数暂时无法确认（创建 MR 时由 GitLab 校验）');
         }
         // Git 直接合并路径不经过 MR，跳过 GitLab API 查询；
         // 源分支不存在时也不可能有 MR，省掉一次必然无用的往返
@@ -661,9 +683,9 @@ export class ReleaseService {
                     ok: false,
                     kind: 'failed',
                     message,
-                    mr: null,
+                    mr: item.mr,
                     sha: null,
-                    url: null,
+                    url: item.mr?.url ?? null,
                     error: message,
                 });
             }
@@ -827,6 +849,8 @@ export class ReleaseService {
                 title: plan.title || `${item.sourceBranch} → ${item.targetBranch}`,
                 description: plan.description ?? undefined,
             }));
+            item.mr = mr;
+            this.store.savePlan(plan);
             if (plan.mode === 'create-mr') {
                 return {
                     projectId: project.id,
@@ -854,8 +878,21 @@ export class ReleaseService {
                 error: null,
             };
         }
-        if (mr.mergeStatus !== 'mergeable' && mr.mergeStatus !== 'checking') {
-            throw new Error(mr.detail || `MR !${mr.iid} 当前不可合并`);
+        const mrIid = mr.iid;
+        mr = await guard(() => adapter.getMr(path, mrIid));
+        item.mr = mr;
+        this.store.savePlan(plan);
+        const latestMr = mr;
+        mr = await guard(() => adapter.waitForMergeable(path, latestMr));
+        item.mr = mr;
+        this.store.savePlan(plan);
+        if (mr.state !== 'opened')
+            throw new Error(`MR !${mr.iid} 当前为 ${mr.state}，未执行合并`);
+        if (mr.mergeStatus === 'checking') {
+            throw new Error(`MR !${mr.iid} 状态计算尚未完成，请稍后重新预检；${mr.detail || 'GitLab 正在准备 MR'}`);
+        }
+        if (mr.mergeStatus !== 'mergeable') {
+            throw new Error(`MR !${mr.iid}：${mr.detail || '当前不可合并'}`);
         }
         const merged = await guard(() => adapter.mergeMr(path, mr.iid, sourceSha, {
             deleteSourceBranch: plan.deleteSourceBranch,
@@ -990,9 +1027,6 @@ function isPermissionError(status) {
 function pickSha(refs, ref) {
     const name = ref.replace(/^refs\/heads\//, '');
     return refs.find((r) => r.name === name)?.sha ?? null;
-}
-function isTrunk(name) {
-    return /^(master|main|develop|dev|pre|prod|release)$/i.test(name);
 }
 function defaultTitle(mode, source, target) {
     if (mode === 'merge-git')

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { WEB_PAGE } from './web-page.js';
 /** 页面与 API 共用的路径前缀。 */
 export const WEB_UI_PATH = '/release-ui';
@@ -28,13 +29,24 @@ export function registerWebUi(ctx, deps) {
 async function handle(req, res, deps) {
     const { service, settings } = deps;
     try {
-        if (!isLoopbackHost(req.headers.host)) {
+        if (!isLoopbackHost(req.headers.host) || !isLoopbackAddress(req.socket.remoteAddress)) {
             json(res, 403, { error: '发版控制台只允许从本机访问' });
             return;
         }
         const url = new URL(req.url ?? '/', 'http://127.0.0.1');
         const path = url.pathname.replace(/\/+$/, '') || WEB_UI_PATH;
         const method = req.method ?? 'GET';
+        if (method !== 'GET' && method !== 'HEAD' && req.headers.origin && req.headers.origin !== `http://${req.headers.host}`
+            && req.headers.origin !== `https://${req.headers.host}`) {
+            json(res, 403, { error: '不允许跨站调用发版接口' });
+            return;
+        }
+        if (method === 'GET' && path === `${WEB_UI_PATH}/app.js`) {
+            const script = readFileSync(new URL('./standalone.js', import.meta.url));
+            res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+            res.end(script);
+            return;
+        }
         if ((method === 'GET' || method === 'HEAD') && (path === WEB_UI_PATH || path === `${WEB_UI_PATH}/index.html`)) {
             sendHtml(res, WEB_PAGE);
             return;
@@ -54,7 +66,7 @@ async function handle(req, res, deps) {
             const baseUrl = text(body.gitlabBaseUrl);
             const token = text(body.gitlabToken);
             json(res, 200, await settings.test({
-                ...(baseUrl ? { baseUrl } : {}),
+                ...(typeof body.gitlabBaseUrl === 'string' ? { baseUrl } : {}),
                 // 空令牌表示「用已保存的那把」，不覆盖
                 ...(token ? { token } : {}),
             }));
@@ -71,6 +83,11 @@ async function handle(req, res, deps) {
         }
         if (method === 'GET' && path === `${WEB_UI_PATH}/api/branches`) {
             await searchBranches(res, service, url.searchParams.get('keyword') ?? '');
+            return;
+        }
+        if (method === 'GET' && path === `${WEB_UI_PATH}/api/branch-options`) {
+            const ids = url.searchParams.getAll('project');
+            json(res, 200, await service.branchOptions(url.searchParams.get('keyword') ?? '', ids.length ? ids : undefined, url.searchParams.get('refresh') === '1'));
             return;
         }
         if (method === 'GET' && path === `${WEB_UI_PATH}/api/mrs`) {
@@ -142,6 +159,8 @@ async function runCheck(req, res, service) {
     const sourceBranch = text(body.sourceBranch);
     if (!sourceBranch)
         throw new Error('sourceBranch 必填');
+    if (Array.isArray(body.projects) && body.projects.length === 0)
+        throw new Error('请至少选择一个仓库');
     const plan = await service.planMerge({
         mode,
         sourceBranch,
@@ -149,7 +168,7 @@ async function runCheck(req, res, service) {
         projectIds: stringArray(body.projects),
         title: text(body.title) || undefined,
         description: text(body.description) || undefined,
-        refresh: body.refresh === true,
+        refresh: body.refresh !== false,
     });
     json(res, 200, plan);
 }
@@ -176,6 +195,9 @@ function isLoopbackHost(host) {
         return false;
     const name = host.replace(/:\d+$/, '').trim().toLowerCase();
     return name === '127.0.0.1' || name === 'localhost' || name === '[::1]' || name === '::1';
+}
+function isLoopbackAddress(address) {
+    return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 function text(value) {
     return typeof value === 'string' ? value.trim() : '';

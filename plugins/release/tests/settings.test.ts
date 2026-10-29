@@ -484,6 +484,23 @@ describe('设置 HTTP 接口', () => {
     expect(JSON.stringify(body)).not.toContain(BASE_SETTINGS.gitlabToken);
   });
 
+  it('拒绝其他网页跨站修改设置', async () => {
+    const res = await fetch(`${origin}/release-ui/api/settings`, {
+      method: 'POST', headers: { origin: 'https://untrusted.example', 'content-type': 'application/json' },
+      body: JSON.stringify({ gitlabBaseUrl: 'https://changed.example' }),
+    });
+    expect(res.status).toBe(403);
+    expect(bridge.view().gitlabBaseUrl).not.toBe('https://changed.example');
+  });
+
+  it('空仓库选择不能退化为全部仓库', async () => {
+    const res = await fetch(`${origin}/release-ui/api/check`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'create-mr', sourceBranch: 'feature/test', projects: [] }),
+    });
+    expect((await res.json() as { error: string }).error).toContain('至少选择一个仓库');
+  });
+
   it('POST /api/settings 校验失败返回 200 + ok=false', async () => {
     const res = await fetch(`${origin}/release-ui/api/settings`, {
       method: 'POST',
@@ -545,14 +562,12 @@ describe('设置 HTTP 接口', () => {
     expect(body.tasks[0]?.results).toHaveLength(3);
   });
 
-  it('页面本身能拿到，且包含设置区', async () => {
+  it('页面加载与 Harness 共用的 React 应用', async () => {
     const res = await fetch(`${origin}/release-ui`);
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('id="settingsCard"');
-    expect(html).toContain('id="saveBtn"');
-    expect(html).toContain('测试 GitLab 连接');
-    expect(html).toContain('id="taskCard"');
-    expect(html).toContain('任务中心');
+    expect(html).toContain('id="app"');
+    expect(html).toContain('src="/release-ui/app.js"');
+    expect(html).toContain('批量发版');
   });
 });

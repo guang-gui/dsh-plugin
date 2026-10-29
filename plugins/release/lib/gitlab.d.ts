@@ -37,8 +37,17 @@ export declare class GitLabAdapter {
     tokenScope(): Promise<TokenScope>;
     private detectScope;
     getBranch(project: number | string, branch: string): Promise<BranchRef | null>;
+    /** Read the complete branch list once; never send a request for each keystroke. */
+    listBranches(project: number | string): Promise<Array<{
+        name: string;
+        sha: string;
+    }>>;
+    /** Compare the pinned commits without fetching objects into the user's checkout. */
+    countAhead(project: number | string, baseSha: string, headSha: string): Promise<number>;
     listOpenMrs(project: number | string, source: string, target: string): Promise<MrRef[]>;
-    getMr(project: number | string, iid: number): Promise<MrRef>;
+    getMr(project: number | string, iid: number, timeoutMs?: number): Promise<MrRef>;
+    /** GitLab prepares a new MR asynchronously; only poll transient states, with a total deadline. */
+    waitForMergeable(project: number | string, initial: MrRef, timeoutMs?: number): Promise<MrRef>;
     createMr(project: number | string, input: {
         sourceBranch: string;
         targetBranch: string;

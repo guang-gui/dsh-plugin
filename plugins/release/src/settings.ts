@@ -19,6 +19,8 @@ export const SETTINGS_FILE = 'settings.json';
 export interface PluginSettings {
   /** GitLab 实例地址，例如 https://git.example.com；空表示未配置 */
   gitlabBaseUrl: string;
+  /** Account label; authentication always uses the personal access token. */
+  gitlabAccount?: string;
   /** 个人访问令牌（scope: api）；空表示改用环境变量 */
   gitlabToken: string;
   /** 令牌所在环境变量名 */
@@ -102,6 +104,7 @@ export function normalizeSettings(patch: SettingsPatch, base: PluginSettings): N
     // 空字符串是有意义的：表示清空已保存的令牌，回落到环境变量
     next.gitlabToken = asString(patch.gitlabToken);
   }
+  if (patch.gitlabAccount !== undefined) next.gitlabAccount = asString(patch.gitlabAccount);
 
   if (patch.tokenEnv !== undefined) {
     const raw = asString(patch.tokenEnv);
@@ -186,6 +189,7 @@ export function coerceSettings(raw: unknown, base: PluginSettings): PluginSettin
   const merged: SettingsPatch = {};
   if (typeof input.gitlabBaseUrl === 'string') merged.gitlabBaseUrl = input.gitlabBaseUrl;
   if (typeof input.gitlabToken === 'string') merged.gitlabToken = input.gitlabToken;
+  if (typeof input.gitlabAccount === 'string') merged.gitlabAccount = input.gitlabAccount;
   if (typeof input.tokenEnv === 'string') merged.tokenEnv = input.tokenEnv;
   if (Array.isArray(input.roots)) merged.roots = input.roots.filter((r): r is string => typeof r === 'string');
   if (input.scanDepth !== undefined) merged.scanDepth = clampInt(input.scanDepth, 1, 8, base.scanDepth);
@@ -214,6 +218,10 @@ export function coerceSettings(raw: unknown, base: PluginSettings): PluginSettin
     }
     if (key === 'gitlabToken') {
       next.gitlabToken = asString(value as string);
+      continue;
+    }
+    if (key === 'gitlabAccount') {
+      next.gitlabAccount = asString(value);
       continue;
     }
     if (key === 'tokenEnv') {

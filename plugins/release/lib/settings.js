@@ -64,6 +64,8 @@ export function normalizeSettings(patch, base) {
         // 空字符串是有意义的：表示清空已保存的令牌，回落到环境变量
         next.gitlabToken = asString(patch.gitlabToken);
     }
+    if (patch.gitlabAccount !== undefined)
+        next.gitlabAccount = asString(patch.gitlabAccount);
     if (patch.tokenEnv !== undefined) {
         const raw = asString(patch.tokenEnv);
         if (raw && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(raw)) {
@@ -157,6 +159,8 @@ export function coerceSettings(raw, base) {
         merged.gitlabBaseUrl = input.gitlabBaseUrl;
     if (typeof input.gitlabToken === 'string')
         merged.gitlabToken = input.gitlabToken;
+    if (typeof input.gitlabAccount === 'string')
+        merged.gitlabAccount = input.gitlabAccount;
     if (typeof input.tokenEnv === 'string')
         merged.tokenEnv = input.tokenEnv;
     if (Array.isArray(input.roots))
@@ -191,6 +195,10 @@ export function coerceSettings(raw, base) {
         }
         if (key === 'gitlabToken') {
             next.gitlabToken = asString(value);
+            continue;
+        }
+        if (key === 'gitlabAccount') {
+            next.gitlabAccount = asString(value);
             continue;
         }
         if (key === 'tokenEnv') {

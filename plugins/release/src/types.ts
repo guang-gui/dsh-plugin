@@ -43,6 +43,8 @@ export interface MrRef {
   targetBranch: string;
   pipeline: 'success' | 'failed' | 'running' | 'pending' | 'skipped' | 'none';
   mergeStatus: MrMergeStatus;
+  /** Original GitLab detailed_merge_status, retained for diagnosis and task history. */
+  rawMergeStatus?: string;
   detail?: string;
   mergeCommitSha: string | null;
 }

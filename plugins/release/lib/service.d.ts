@@ -14,6 +14,7 @@ export interface ResolvedConfig {
     scanDepth: number;
     gitlabBaseUrl: string;
     gitlabToken: string;
+    gitlabAccount?: string;
     projects: ConfigProject[];
     defaultTarget: string;
     concurrency: number;
@@ -67,6 +68,7 @@ export declare class ReleaseService {
     private readonly treeCache;
     private initPromise;
     private initError;
+    private branches;
     constructor(config: ResolvedConfig, git: GitExecutor, logger?: Logger);
     /**
      * 运行时改配置：界面上保存设置后调用，不需要重启 dsh。
@@ -108,7 +110,18 @@ export declare class ReleaseService {
     private scanProjects;
     private hostOfBase;
     private selectProjects;
-    /** 跨仓库按关键词查分支。关键词为空时返回各仓库的主干分支，便于选目标分支。 */
+    branchOptions(keyword?: string, projectIds?: string[], refresh?: boolean): Promise<{
+        options: import("./branch-catalog.js").BranchOption[];
+        totalProjects: number;
+        remoteProjects: number;
+        loading: boolean;
+        errors: {
+            project: string;
+            message: string;
+        }[];
+    }>;
+    private createBranchCatalog;
+    /** Tools share the same fuzzy catalog as the UI; cached searches do not query the network again. */
     findBranches(keyword: string, projectIds?: string[], limit?: number): Promise<BranchMatch[]>;
     planMerge(input: PlanInput): Promise<MergePlan>;
     private checkProject;

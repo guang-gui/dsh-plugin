@@ -7,6 +7,7 @@ export declare const WEB_UI_PATH = "/release-ui";
 /** 对外的设置视图：令牌只给「是否已设置 + 末四位」，永不回传明文。 */
 export interface SettingsView {
     gitlabBaseUrl: string;
+    gitlabAccount?: string;
     tokenSet: boolean;
     tokenHint: string;
     /** saved=界面保存的；env=来自 YAML 或环境变量；none=都没有 */

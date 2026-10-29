@@ -35,6 +35,7 @@ export interface Bridge {
 export function toPluginSettings(r: ResolvedConfig, tokenEnv = 'GITLAB_TOKEN'): PluginSettings {
   return {
     gitlabBaseUrl: r.gitlabBaseUrl,
+    gitlabAccount: r.gitlabAccount ?? '',
     gitlabToken: r.gitlabToken,
     tokenEnv,
     roots: r.roots,
@@ -57,7 +58,8 @@ export function buildResolved(base: ResolvedConfig, s: PluginSettings): Resolved
     roots: s.roots,
     scanDepth: s.scanDepth,
     gitlabBaseUrl: s.gitlabBaseUrl,
-    gitlabToken: s.gitlabToken || base.gitlabToken,
+    gitlabToken: s.gitlabToken || process.env[s.tokenEnv]?.trim() || base.gitlabToken,
+    gitlabAccount: s.gitlabAccount ?? '',
     defaultTarget: s.defaultTarget,
     concurrency: s.concurrency,
     headCacheTtlSec: s.headCacheTtlSec,
@@ -68,10 +70,11 @@ export function buildResolved(base: ResolvedConfig, s: PluginSettings): Resolved
 
 /** 对外的设置视图：令牌只给「是否已设置 + 末四位」 */
 export function settingsView(base: ResolvedConfig, s: PluginSettings): SettingsView {
-  const fallback = base.gitlabToken;
+  const fallback = process.env[s.tokenEnv]?.trim() || base.gitlabToken;
   const token = s.gitlabToken || fallback;
   return {
     gitlabBaseUrl: s.gitlabBaseUrl,
+    gitlabAccount: s.gitlabAccount ?? '',
     tokenSet: Boolean(token),
     tokenHint: maskToken(token),
     tokenSource: s.gitlabToken ? 'saved' : fallback ? 'env' : 'none',
@@ -105,8 +108,8 @@ export function createSettingsBridge(opts: BridgeOptions): Bridge {
     }
 
     const before = { roots: current.roots.join('\u0000'), depth: current.scanDepth };
+    store.save(result.settings);
     current = result.settings;
-    store.save(current);
     service.reconfigure(buildResolved(base, current));
 
     const needsRescan = before.roots !== current.roots.join('\u0000') || before.depth !== current.scanDepth;

@@ -49,3 +49,11 @@ const wrapped = [
 await mkdir(dirname(outFile), { recursive: true });
 await writeFile(outFile, wrapped);
 console.log(`client bundle: ${outFile} (${String(Buffer.byteLength(wrapped))} bytes)`);
+
+// The standalone page and Harness panel share the exact same components.
+await build({
+  entryPoints: [resolve(root, 'src/client/standalone.tsx')],
+  outfile: resolve(root, 'lib/standalone.js'),
+  bundle: true, format: 'iife', platform: 'browser', target: 'es2022', jsx: 'automatic',
+  minify: true, define: { 'process.env.NODE_ENV': '"production"' }, legalComments: 'none',
+});
