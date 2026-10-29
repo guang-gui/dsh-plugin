@@ -17,6 +17,26 @@ export interface BranchRef {
     committedAt: string | null;
     author: string | null;
 }
+export interface BranchCreationItem {
+    projectId: string;
+    name: string;
+    branchName: string;
+    baseBranch: string | null;
+    baseSha: string | null;
+    sha: string | null;
+    status: 'created' | 'exists' | 'failed' | 'unknown';
+    message: string;
+    url: string | null;
+}
+export interface BranchCreationResult {
+    branchName: string;
+    total: number;
+    created: number;
+    exists: number;
+    failed: number;
+    unknown: number;
+    items: BranchCreationItem[];
+}
 export type MrState = 'opened' | 'merged' | 'closed' | 'locked' | 'unknown';
 export type MrMergeStatus = 'mergeable' | 'conflict' | 'not-approved' | 'ci-failed' | 'blocked' | 'checking' | 'unknown';
 export interface MrRef {

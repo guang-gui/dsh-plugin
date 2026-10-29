@@ -23,6 +23,28 @@ export interface BranchRef {
   author: string | null;
 }
 
+export interface BranchCreationItem {
+  projectId: string;
+  name: string;
+  branchName: string;
+  baseBranch: string | null;
+  baseSha: string | null;
+  sha: string | null;
+  status: 'created' | 'exists' | 'failed' | 'unknown';
+  message: string;
+  url: string | null;
+}
+
+export interface BranchCreationResult {
+  branchName: string;
+  total: number;
+  created: number;
+  exists: number;
+  failed: number;
+  unknown: number;
+  items: BranchCreationItem[];
+}
+
 export type MrState = 'opened' | 'merged' | 'closed' | 'locked' | 'unknown';
 
 export type MrMergeStatus =

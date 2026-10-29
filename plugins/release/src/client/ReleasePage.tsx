@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { api } from './api.js';
 import { BranchInput } from './BranchInput.js';
+import { BranchCreatePanel } from './BranchCreatePanel.js';
 import { SettingsPanel } from './SettingsPanel.js';
 import { TasksPanel } from './TasksPanel.js';
 import type { BranchOption } from '../branch-catalog.js';
@@ -143,6 +144,7 @@ const STYLE = `
 .rel-brand { padding: 4px 12px 22px; font-size: 11px; letter-spacing: .16em; color: var(--dsw-alias-label-tertiary); }
 .rel-nav button { display: block; text-align: left; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; margin-bottom: 5px; }
 .rel-nav button[aria-current=page] { background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent); color: var(--dsw-alias-state-business-primary); font-weight: 600; }
+.rel-nav button:disabled { opacity: .5; cursor: default; }
 .rel-content { max-width: 1160px; margin: 0 auto; }
 .rel-head h1 { font-size: 20px; font-weight: 600; }
 .rel-head { align-items: center; }
@@ -207,7 +209,7 @@ const MR_LABEL: Record<string, [string, 'ok' | 'warn' | 'bad' | 'plain']> = {
 /* 页面                                                                */
 /* ------------------------------------------------------------------ */
 
-export function ReleasePage({ initialTab = 'release' }: { initialTab?: 'release' | 'settings' | 'tasks' } = {}): ReactElement {
+export function ReleasePage({ initialTab = 'release' }: { initialTab?: 'release' | 'branches' | 'settings' | 'tasks' } = {}): ReactElement {
   const [tab, setTab] = useState(initialTab);
   const [settings, setSettings] = useState<SettingsView | null>(null);
   const [catalog, setCatalog] = useState<CatalogView | null>(null);
@@ -230,8 +232,9 @@ export function ReleasePage({ initialTab = 'release' }: { initialTab?: 'release'
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [creatingBranches, setCreatingBranches] = useState(false);
   const checkRequest = useRef<{ controller: AbortController; timer: number } | null>(null);
-  const formLocked = loadingProjects || applying;
+  const formLocked = loadingProjects || applying || creatingBranches;
   const busy = formLocked || checking;
   const [status, setStatus] = useState('正在加载…');
   const hint = applying ? '执行中…' : loadingProjects ? '正在读取仓库…'
@@ -398,18 +401,21 @@ export function ReleasePage({ initialTab = 'release' }: { initialTab?: 'release'
   return (
     <div className="rel-shell">
       <nav className="rel-nav" aria-label="发版导航"><div className="rel-brand">RELEASE DESK</div>
-        <button aria-current={tab === 'release' ? 'page' : undefined} onClick={() => setTab('release')}>批量发版</button>
-        <button aria-current={tab === 'tasks' ? 'page' : undefined} onClick={() => setTab('tasks')}>任务中心</button>
-        <button aria-current={tab === 'settings' ? 'page' : undefined} onClick={() => setTab('settings')}>发版设置</button>
+        <button disabled={creatingBranches || applying} aria-current={tab === 'release' ? 'page' : undefined} onClick={() => setTab('release')}>批量发版</button>
+        <button disabled={creatingBranches || applying} aria-current={tab === 'branches' ? 'page' : undefined} onClick={() => { cancelCheck(); setTab('branches'); }}>批量创建分支</button>
+        <button disabled={creatingBranches || applying} aria-current={tab === 'tasks' ? 'page' : undefined} onClick={() => setTab('tasks')}>任务中心</button>
+        <button disabled={creatingBranches || applying} aria-current={tab === 'settings' ? 'page' : undefined} onClick={() => setTab('settings')}>发版设置</button>
       </nav><div className="rel-page"><div className="rel-content">
       <div className="rel-head">
-        <div><h1>{tab === 'settings' ? '发版设置' : tab === 'tasks' ? '任务中心' : '批量发版'}</h1>
+        <div><h1>{tab === 'settings' ? '发版设置' : tab === 'tasks' ? '任务中心' : tab === 'branches' ? '批量创建分支' : '批量发版'}</h1>
         <span className="rel-status">{status}</span></div>
-        <button className="rel-btn secondary" onClick={() => setTab(tab === 'settings' ? 'release' : 'settings')}>{tab === 'settings' ? '返回发版' : '设置'}</button>
+        <button className="rel-btn secondary" disabled={creatingBranches || applying} onClick={() => setTab(tab === 'settings' ? 'release' : 'settings')}>{tab === 'settings' ? '返回发版' : '设置'}</button>
       </div>
 
       {tab === 'settings' && <SettingsPanel onSaved={savedSettings} />}
       {tab === 'tasks' && <TasksPanel onReuse={(task) => { setMode(task.mode); setSource(task.sourceBranch); setTarget(task.targetBranch); setTitle(task.title ?? ''); setSelected(Object.fromEntries(projects.map((p) => [p.id, task.results.some((r) => r.projectId === p.id)]))); invalidatePlan(); setTab('release'); }} />}
+      <div hidden={tab !== 'branches'}><BranchCreatePanel projects={projects} gitlabReady={settings?.gitlabReady ?? false}
+        loading={loadingProjects || applying} onBusyChange={(value) => { setCreatingBranches(value); if (value) invalidatePlan(); }} onCreated={refreshBranches} /></div>
       {tab === 'release' && <>
       {settings && (!settings.gitlabReady || !settings.roots.length) && <div className="rel-notice">{!settings.roots.length ? '请先添加扫描目录，发现本地仓库。' : 'GitLab 连接尚未配齐，请到设置中配置地址与令牌。'} <button className="rel-text-btn" onClick={() => setTab('settings')}>打开设置 →</button></div>}
       <div className="rel-card">

@@ -50,6 +50,7 @@ export class ReleaseService {
     initPromise = null;
     initError = null;
     branches;
+    creatingBranches = false;
     constructor(config, git, logger = NULL_LOGGER) {
         this.config = config;
         this.git = git;
@@ -222,6 +223,95 @@ export class ReleaseService {
     /* ------------------------------------------------------------------ */
     /* 分支                                                                */
     /* ------------------------------------------------------------------ */
+    async createBranches(input) {
+        const branchName = input.branchName.trim();
+        if (!isValidBranchName(branchName))
+            throw new Error(`新分支名不合法：${branchName || '不能为空'}`);
+        if (!Array.isArray(input.projectIds) || !input.projectIds.length
+            || input.projectIds.some((id) => typeof id !== 'string' || !id.trim()))
+            throw new Error('请至少选择一个有效项目');
+        await this.ready();
+        if (this.creatingBranches)
+            throw new Error('已有批量创建分支任务执行中，请等待完成');
+        const ids = new Set(input.projectIds);
+        const projects = this.projects.filter((project) => ids.has(project.id) && project.enabled);
+        if (projects.length !== ids.size)
+            throw new Error('选择的项目已失效或被停用，请刷新后重新选择');
+        const adapter = this.adapterFor();
+        if (!adapter)
+            throw new Error('请先配置 GitLab 地址和令牌');
+        const baseUrl = this.config.gitlabBaseUrl.replace(/\/$/, '');
+        this.creatingBranches = true;
+        const items = [];
+        try {
+            // Keep remote writes sequential; each repository has an independent result.
+            for (const project of projects) {
+                const item = { projectId: project.id, name: project.name, branchName,
+                    baseBranch: null, baseSha: null, sha: null, status: 'failed', message: '', url: null };
+                const url = `${baseUrl}/${project.gitlabPath}/-/tree/${encodeURIComponent(branchName)}`;
+                try {
+                    if (parseRemoteUrl(project.remoteUrl)?.host !== new URL(baseUrl).hostname.toLowerCase()) {
+                        throw new Error('项目不属于当前配置的 GitLab，未创建分支');
+                    }
+                    item.baseBranch = await adapter.getDefaultBranch(project.gitlabPath);
+                    const existing = await adapter.getBranch(project.gitlabPath, branchName);
+                    if (existing) {
+                        item.status = 'exists';
+                        item.sha = existing.sha;
+                        item.url = url;
+                        item.message = '分支已存在，已跳过';
+                    }
+                    else {
+                        const base = await adapter.getBranch(project.gitlabPath, item.baseBranch);
+                        if (!base)
+                            throw new Error(`基线分支 ${item.baseBranch} 不存在`);
+                        item.baseSha = base.sha;
+                        try {
+                            const created = await adapter.createBranch(project.gitlabPath, branchName, base.sha);
+                            item.status = 'created';
+                            item.sha = created.sha;
+                            item.url = url;
+                            item.message = `已从 ${item.baseBranch} 创建`;
+                        }
+                        catch (error) {
+                            // A failed response can still follow a successful write. Reconcile before reporting or retrying.
+                            const uncertain = !(error instanceof HttpError) || error.status >= 500;
+                            const canReconcile = uncertain || (error instanceof HttpError && (error.status === 400 || error.status === 409));
+                            const actual = canReconcile ? await adapter.getBranch(project.gitlabPath, branchName).catch(() => null) : null;
+                            if (actual) {
+                                item.status = 'exists';
+                                item.sha = actual.sha;
+                                item.url = url;
+                                item.message = '已核实分支存在，未重复创建';
+                            }
+                            else if (uncertain) {
+                                item.status = 'unknown';
+                                item.message = `创建结果待确认：${errorMessage(error)}`;
+                            }
+                            else
+                                throw error;
+                        }
+                    }
+                    if (item.sha)
+                        this.rememberHead(project.id, `refs/heads/${branchName}`, item.sha);
+                }
+                catch (error) {
+                    item.message = errorMessage(error);
+                }
+                items.push(item);
+            }
+            if (items.some((item) => item.sha))
+                this.branches = this.createBranchCatalog();
+            return { branchName, total: items.length,
+                created: items.filter((item) => item.status === 'created').length,
+                exists: items.filter((item) => item.status === 'exists').length,
+                failed: items.filter((item) => item.status === 'failed').length,
+                unknown: items.filter((item) => item.status === 'unknown').length, items };
+        }
+        finally {
+            this.creatingBranches = false;
+        }
+    }
     async branchOptions(keyword = '', projectIds, refresh = false) {
         await this.ready();
         const catalog = this.branches;

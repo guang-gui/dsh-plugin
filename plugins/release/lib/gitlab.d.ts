@@ -37,6 +37,8 @@ export declare class GitLabAdapter {
     tokenScope(): Promise<TokenScope>;
     private detectScope;
     getBranch(project: number | string, branch: string): Promise<BranchRef | null>;
+    getDefaultBranch(project: number | string): Promise<string>;
+    createBranch(project: number | string, branchName: string, baseSha: string): Promise<BranchRef>;
     /** Read the complete branch list once; never send a request for each keystroke. */
     listBranches(project: number | string): Promise<Array<{
         name: string;

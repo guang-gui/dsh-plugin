@@ -179,6 +179,15 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: WebUiDeps
       await searchBranches(res, service, url.searchParams.get('keyword') ?? '');
       return;
     }
+    if (method === 'POST' && path === `${WEB_UI_PATH}/api/branches/create`) {
+      const body = await readJson(req);
+      if (!Array.isArray(body.projects) || !body.projects.length
+        || body.projects.some((id) => typeof id !== 'string' || !id.trim())) {
+        throw new Error('请至少选择一个有效项目');
+      }
+      json(res, 200, await service.createBranches({ branchName: text(body.branchName), projectIds: body.projects as string[] }));
+      return;
+    }
     if (method === 'GET' && path === `${WEB_UI_PATH}/api/branch-options`) {
       const ids = url.searchParams.getAll('project');
       json(res, 200, await service.branchOptions(url.searchParams.get('keyword') ?? '',

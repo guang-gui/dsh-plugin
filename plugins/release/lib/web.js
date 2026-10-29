@@ -85,6 +85,15 @@ async function handle(req, res, deps) {
             await searchBranches(res, service, url.searchParams.get('keyword') ?? '');
             return;
         }
+        if (method === 'POST' && path === `${WEB_UI_PATH}/api/branches/create`) {
+            const body = await readJson(req);
+            if (!Array.isArray(body.projects) || !body.projects.length
+                || body.projects.some((id) => typeof id !== 'string' || !id.trim())) {
+                throw new Error('请至少选择一个有效项目');
+            }
+            json(res, 200, await service.createBranches({ branchName: text(body.branchName), projectIds: body.projects }));
+            return;
+        }
         if (method === 'GET' && path === `${WEB_UI_PATH}/api/branch-options`) {
             const ids = url.searchParams.getAll('project');
             json(res, 200, await service.branchOptions(url.searchParams.get('keyword') ?? '', ids.length ? ids : undefined, url.searchParams.get('refresh') === '1'));

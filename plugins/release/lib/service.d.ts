@@ -1,5 +1,5 @@
 import type { GitExecutor } from './git.js';
-import type { ApplyResult, MergePlan, MergeStrategy, MrRef, PlanMode, Project, TaskRecord } from './types.js';
+import type { ApplyResult, BranchCreationResult, MergePlan, MergeStrategy, MrRef, PlanMode, Project, TaskRecord } from './types.js';
 export interface ConfigProject {
     /** GitLab path_with_namespace 或 remote URL，用来匹配扫描结果 */
     path?: string;
@@ -69,6 +69,7 @@ export declare class ReleaseService {
     private initPromise;
     private initError;
     private branches;
+    private creatingBranches;
     constructor(config: ResolvedConfig, git: GitExecutor, logger?: Logger);
     /**
      * 运行时改配置：界面上保存设置后调用，不需要重启 dsh。
@@ -110,6 +111,10 @@ export declare class ReleaseService {
     private scanProjects;
     private hostOfBase;
     private selectProjects;
+    createBranches(input: {
+        branchName: string;
+        projectIds: string[];
+    }): Promise<BranchCreationResult>;
     branchOptions(keyword?: string, projectIds?: string[], refresh?: boolean): Promise<{
         options: import("./branch-catalog.js").BranchOption[];
         totalProjects: number;

@@ -93,6 +93,20 @@ export class GitLabAdapter {
             throw e;
         }
     }
+    async getDefaultBranch(project) {
+        const data = await this.api(`/projects/${this.projectPath(project)}`);
+        return data.default_branch?.trim() || 'master';
+    }
+    async createBranch(project, branchName, baseSha) {
+        const data = await this.api(`/projects/${this.projectPath(project)}/repository/branches`, {
+            method: 'POST', body: { branch: branchName, ref: baseSha }, timeoutMs: 30_000,
+        });
+        if (data.name !== branchName || data.commit?.id !== baseSha) {
+            throw new Error('GitLab 返回的分支或提交与创建请求不一致，需要重新核实');
+        }
+        return { name: data.name, sha: data.commit.id,
+            committedAt: data.commit.committed_date ?? null, author: data.commit.author_name ?? null };
+    }
     /** Read the complete branch list once; never send a request for each keystroke. */
     async listBranches(project) {
         const refs = [];

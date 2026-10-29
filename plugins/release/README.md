@@ -50,6 +50,16 @@ http://127.0.0.1:<宿主端口>/release-ui
 保存后立刻 `service.reconfigure()` 生效，扫描参数变了会自动重扫；**不需要重启 dsh**。
 设置落在 `$DSH_HOME/release-plugin/settings.json`，优先级高于 `cordis.patch.yml`。
 
+### 批量创建分支
+
+在页内左侧打开「批量创建分支」，勾选项目并输入新分支名称，点击「创建分支」确认即可。
+
+- 从每个项目在 GitLab 上设置的默认分支（通常是 `master`）的最新提交创建；不使用发版的「默认目标分支」配置
+- 仅处理明确勾选的启用项目；需要已配置 GitLab 地址和具有创建分支权限的令牌
+- 直接创建 GitLab 远端分支，不切换本地工作区；已存在的分支跳过，不覆盖
+- 每个项目分别显示基线、提交、结果、原因和链接；单个失败后继续处理其他项目
+- 请求中断时会核实远端；无法确认的标为「待确认」，可用同一分支名重试核实
+
 ### 任务中心
 
 每次「确认执行」都会留一条记录（保留最近 50 条，`tasks.json`）：
@@ -69,6 +79,7 @@ http://127.0.0.1:<宿主端口>/release-ui
 | 浏览目录 | `GET /release-ui/api/settings/dirs?path=` | — |
 | 加载/重新扫描仓库 | `GET /release-ui/api/projects` | `release_projects` |
 | 搜分支 | `GET /release-ui/api/branches` | `release_branches` |
+| 批量创建分支 | `POST /release-ui/api/branches/create`（`branchName`、`projects` ID 数组） | — |
 | 下拉候选（本地优先、异步更新） | `GET /release-ui/api/branch-options`（可带 `keyword`、重复 `project`、`refresh=1`） | — |
 | 预检 | `POST /release-ui/api/check` | `release_check` |
 | 确认执行 | `POST /release-ui/api/apply` | `release_apply` |

@@ -31,7 +31,7 @@ window.__ModuleLoader__.load({
 		module.exports = __toCommonJS(index_exports);
 
 		// src/client/ReleasePage.tsx
-		var import_react4 = require("react");
+		var import_react5 = require("react");
 
 		// src/client/api.ts
 		async function api(path, init) {
@@ -182,19 +182,172 @@ window.__ModuleLoader__.load({
 		  ] });
 		}
 
-		// src/client/SettingsPanel.tsx
+		// src/client/BranchCreatePanel.tsx
 		var import_react2 = require("react");
 		var import_jsx_runtime2 = require("react/jsx-runtime");
-		function SettingsPanel({ onSaved }) {
-		  const [form, setForm] = (0, import_react2.useState)(null);
-		  const [token, setToken] = (0, import_react2.useState)("");
-		  const [clearToken, setClearToken] = (0, import_react2.useState)(false);
-		  const [path, setPath] = (0, import_react2.useState)("");
-		  const [dirs, setDirs] = (0, import_react2.useState)(null);
+		var STATUS = {
+		  created: { label: "\u5DF2\u521B\u5EFA", tone: "ok" },
+		  exists: { label: "\u5DF2\u5B58\u5728", tone: "plain" },
+		  failed: { label: "\u5931\u8D25", tone: "bad" },
+		  unknown: { label: "\u5F85\u786E\u8BA4", tone: "warn" }
+		};
+		function BranchCreatePanel({ projects, gitlabReady, loading, onBusyChange, onCreated }) {
+		  const [query, setQuery] = (0, import_react2.useState)("");
+		  const [selected, setSelected] = (0, import_react2.useState)({});
+		  const [branchName, setBranchName] = (0, import_react2.useState)("");
 		  const [busy, setBusy] = (0, import_react2.useState)(false);
-		  const [message, setMessage] = (0, import_react2.useState)("");
-		  const [test, setTest] = (0, import_react2.useState)(null);
-		  (0, import_react2.useEffect)(() => {
+		  const submitting = (0, import_react2.useRef)(false);
+		  const [error, setError] = (0, import_react2.useState)("");
+		  const [result, setResult] = (0, import_react2.useState)(null);
+		  const enabled = (0, import_react2.useMemo)(() => projects.filter((p) => p.enabled), [projects]);
+		  const ids = enabled.filter((p) => selected[p.id]).map((p) => p.id);
+		  const visible = projects.filter((p) => `${p.name} ${p.gitlabPath}`.toLowerCase().includes(query.trim().toLowerCase()));
+		  async function create() {
+		    if (submitting.current || loading || !gitlabReady || !ids.length || !branchName.trim()) return;
+		    const name = branchName.trim();
+		    if (!window.confirm(`\u786E\u8BA4\u5728 ${ids.length} \u4E2A\u9879\u76EE\u4E2D\u521B\u5EFA\u300C${name}\u300D\uFF1F
+		\u57FA\u4E8E\u5404\u9879\u76EE\u5F53\u524D\u9ED8\u8BA4\u5206\u652F\uFF0C\u76F4\u63A5\u521B\u5EFA\u5230 GitLab\u3002\u5DF2\u5B58\u5728\u7684\u5206\u652F\u4F1A\u8DF3\u8FC7\u3002`)) return;
+		    submitting.current = true;
+		    setBusy(true);
+		    onBusyChange(true);
+		    setError("");
+		    setResult(null);
+		    try {
+		      const value = await api("/branches/create", {
+		        method: "POST",
+		        body: JSON.stringify({ branchName: name, projects: ids })
+		      });
+		      setResult(value);
+		    } catch (e) {
+		      setError(`${e.message}\u3002\u5982\u8BF7\u6C42\u5DF2\u53D1\u51FA\uFF0C\u90E8\u5206\u9879\u76EE\u53EF\u80FD\u5DF2\u521B\u5EFA\uFF1B\u53EF\u7528\u540C\u4E00\u5206\u652F\u540D\u91CD\u8BD5\u6838\u5B9E\uFF0C\u5DF2\u5B58\u5728\u7684\u5206\u652F\u4F1A\u8DF3\u8FC7\u3002`);
+		    } finally {
+		      submitting.current = false;
+		      setBusy(false);
+		      onBusyChange(false);
+		      onCreated();
+		    }
+		  }
+		  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+		    !gitlabReady && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "rel-notice", children: "\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u914D\u7F6E GitLab \u5730\u5740\u548C\u4EE4\u724C\u3002" }),
+		    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-card", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h2", { children: "\u521B\u5EFA\u5206\u652F" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "rel-hint", children: "\u4ECE\u5404\u9879\u76EE GitLab \u5F53\u524D\u9ED8\u8BA4\u5206\u652F\uFF08\u901A\u5E38\u4E3A master\uFF09\u521B\u5EFA\u540C\u540D\u65B0\u5206\u652F\u3002\u4E0D\u4F1A\u5207\u6362\u672C\u5730\u5DE5\u4F5C\u533A\u3002" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("fieldset", { className: "rel-settings-fields", disabled: busy || loading, children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-grid", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-create-projects", children: "\u9879\u76EE" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-inline", style: { marginBottom: 10 }, children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-create-projects", className: "rel-input", placeholder: "\u7B5B\u9009\u9879\u76EE\u540D\u79F0\u6216\u8DEF\u5F84", value: query, onChange: (e) => setQuery(e.target.value) }),
+		              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "rel-text-btn", onClick: () => setSelected(Object.fromEntries(enabled.map((p) => [p.id, true]))), children: "\u5168\u9009\u9879\u76EE" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "rel-text-btn", onClick: () => setSelected({}), children: "\u6E05\u7A7A\u9879\u76EE" })
+		            ] }),
+		            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-chips", children: [
+		              visible.map((project) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: `rel-chip${selected[project.id] ? "" : " off"}`, title: project.gitlabPath, children: [
+		                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+		                  "input",
+		                  {
+		                    type: "checkbox",
+		                    checked: !!selected[project.id] && project.enabled,
+		                    disabled: !project.enabled,
+		                    onChange: (e) => {
+		                      const checked = e.target.checked;
+		                      setSelected((prev) => ({ ...prev, [project.id]: checked }));
+		                    }
+		                  }
+		                ),
+		                project.name,
+		                !project.enabled ? "\uFF08\u5DF2\u505C\u7528\uFF09" : ""
+		              ] }, project.id)),
+		              !visible.length && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "rel-muted", children: projects.length ? "\u6CA1\u6709\u5339\u914D\u7684\u9879\u76EE" : "\u6CA1\u6709\u53EF\u7528\u9879\u76EE\uFF0C\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u626B\u63CF\u76EE\u5F55" })
+		            ] }),
+		            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-hint", children: [
+		              "\u5DF2\u9009 ",
+		              ids.length,
+		              " / ",
+		              enabled.length,
+		              " \u4E2A\u53EF\u7528\u9879\u76EE"
+		            ] })
+		          ] }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-create-branch", children: "\u65B0\u5206\u652F\u540D\u79F0" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+		            "input",
+		            {
+		              id: "rel-create-branch",
+		              className: "rel-input rel-mono",
+		              value: branchName,
+		              placeholder: "feature/XLS-xxxx_\u529F\u80FD\u540D\u79F0",
+		              onChange: (e) => setBranchName(e.target.value)
+		            }
+		          )
+		        ] }),
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-actions", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "rel-btn", disabled: !gitlabReady || !ids.length || !branchName.trim(), onClick: () => void create(), children: busy ? "\u6B63\u5728\u521B\u5EFA\u2026" : "\u521B\u5EFA\u5206\u652F" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "rel-hint", children: busy ? "\u6B63\u5728\u9010\u4E2A\u5904\u7406\u9879\u76EE\uFF0C\u8BF7\u7B49\u5F85\u7ED3\u679C\u2026" : "\u4EC5\u5904\u7406\u5DF2\u9009\u9879\u76EE\uFF0C\u5DF2\u5B58\u5728\u7684\u5206\u652F\u81EA\u52A8\u8DF3\u8FC7" })
+		        ] })
+		      ] }),
+		      error && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { role: "alert", className: "rel-error", children: error })
+		    ] }),
+		    result && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-card", "aria-live": "polite", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("h2", { children: [
+		        "\u521B\u5EFA\u7ED3\u679C \xB7 ",
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "rel-mono", children: result.branchName })
+		      ] }),
+		      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-summary", children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
+		          "\u9879\u76EE ",
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("b", { children: result.total })
+		        ] }),
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
+		          "\u5DF2\u521B\u5EFA ",
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("b", { children: result.created })
+		        ] }),
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
+		          "\u5DF2\u5B58\u5728 ",
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("b", { children: result.exists })
+		        ] }),
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
+		          "\u5931\u8D25 ",
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("b", { children: result.failed })
+		        ] }),
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
+		          "\u5F85\u786E\u8BA4 ",
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("b", { children: result.unknown })
+		        ] })
+		      ] }),
+		      result.unknown > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "rel-hint", children: "\u90E8\u5206\u8BF7\u6C42\u7ED3\u679C\u5F85\u786E\u8BA4\uFF0C\u53EF\u5728 GitLab \u6838\u5B9E\uFF0C\u6216\u7528\u76F8\u540C\u5206\u652F\u540D\u91CD\u8BD5\uFF1B\u5DF2\u5B58\u5728\u7684\u5206\u652F\u4F1A\u8DF3\u8FC7\u3002" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("table", { className: "rel-table", children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("tr", { children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("th", { children: "\u9879\u76EE" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("th", { children: "\u57FA\u7EBF\u5206\u652F" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("th", { children: "\u7ED3\u679C" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("th", { children: "\u5206\u652F\u63D0\u4EA4" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("th", { children: "\u8BF4\u660E" })
+		        ] }) }),
+		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("tbody", { children: result.items.map((item) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("tr", { children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("td", { children: item.name }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("td", { className: "rel-mono", children: item.baseBranch ?? "\u2014" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: `rel-tag ${STATUS[item.status].tone}`, children: STATUS[item.status].label }) }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("td", { className: "rel-mono", children: item.url ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { className: "rel-link", href: item.url, target: "_blank", rel: "noreferrer", children: item.sha?.slice(0, 10) ?? "\u67E5\u770B\u5206\u652F" }) : "\u2014" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("td", { children: item.message })
+		        ] }, item.projectId)) })
+		      ] }) })
+		    ] })
+		  ] });
+		}
+
+		// src/client/SettingsPanel.tsx
+		var import_react3 = require("react");
+		var import_jsx_runtime3 = require("react/jsx-runtime");
+		function SettingsPanel({ onSaved }) {
+		  const [form, setForm] = (0, import_react3.useState)(null);
+		  const [token, setToken] = (0, import_react3.useState)("");
+		  const [clearToken, setClearToken] = (0, import_react3.useState)(false);
+		  const [path, setPath] = (0, import_react3.useState)("");
+		  const [dirs, setDirs] = (0, import_react3.useState)(null);
+		  const [busy, setBusy] = (0, import_react3.useState)(false);
+		  const [message, setMessage] = (0, import_react3.useState)("");
+		  const [test, setTest] = (0, import_react3.useState)(null);
+		  (0, import_react3.useEffect)(() => {
 		    const controller = new AbortController();
 		    void api("/settings", { signal: controller.signal }).then(setForm).catch((e) => {
 		      if (!controller.signal.aborted) setMessage(e.message);
@@ -266,113 +419,113 @@ window.__ModuleLoader__.load({
 		      setBusy(false);
 		    }
 		  };
-		  if (!form) return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "rel-card", role: "status", children: message || "\u6B63\u5728\u8BFB\u53D6\u8BBE\u7F6E\u2026" });
-		  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { id: "settingsCard", "aria-label": "\u53D1\u7248\u8BBE\u7F6E", children: [
-		    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("fieldset", { disabled: busy, className: "rel-settings-fields", children: [
-		      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-card", children: [
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h2", { children: "GitLab \u8FDE\u63A5" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "rel-hint", children: "\u914D\u7F6E\u5730\u5740\u548C\u4E2A\u4EBA\u8BBF\u95EE\u4EE4\u724C\uFF0C\u6D4B\u8BD5\u540E\u81EA\u52A8\u8BC6\u522B\u8D26\u53F7\u3002\u4FDD\u5B58\u540E\u7ACB\u5373\u751F\u6548\u3002" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-grid", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-url", children: "GitLab \u5730\u5740" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-url", className: "rel-input", value: form.gitlabBaseUrl, placeholder: "https://git.example.com", onChange: (e) => change("gitlabBaseUrl", e.target.value) }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-account", children: "\u8D26\u53F7" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-account", className: "rel-input", value: form.gitlabAccount ?? "", placeholder: "\u8D26\u53F7\u540D\u79F0\uFF0C\u6D4B\u8BD5\u8FDE\u63A5\u540E\u81EA\u52A8\u8BC6\u522B", onChange: (e) => change("gitlabAccount", e.target.value) }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-token", children: "\u8BBF\u95EE\u4EE4\u724C" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-token", className: "rel-input", type: "password", autoComplete: "new-password", value: token, onChange: (e) => {
+		  if (!form) return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "rel-card", role: "status", children: message || "\u6B63\u5728\u8BFB\u53D6\u8BBE\u7F6E\u2026" });
+		  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { id: "settingsCard", "aria-label": "\u53D1\u7248\u8BBE\u7F6E", children: [
+		    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("fieldset", { disabled: busy, className: "rel-settings-fields", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-card", children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { children: "GitLab \u8FDE\u63A5" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "rel-hint", children: "\u914D\u7F6E\u5730\u5740\u548C\u4E2A\u4EBA\u8BBF\u95EE\u4EE4\u724C\uFF0C\u6D4B\u8BD5\u540E\u81EA\u52A8\u8BC6\u522B\u8D26\u53F7\u3002\u4FDD\u5B58\u540E\u7ACB\u5373\u751F\u6548\u3002" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-grid", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-url", children: "GitLab \u5730\u5740" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { id: "rel-url", className: "rel-input", value: form.gitlabBaseUrl, placeholder: "https://git.example.com", onChange: (e) => change("gitlabBaseUrl", e.target.value) }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-account", children: "\u8D26\u53F7" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { id: "rel-account", className: "rel-input", value: form.gitlabAccount ?? "", placeholder: "\u8D26\u53F7\u540D\u79F0\uFF0C\u6D4B\u8BD5\u8FDE\u63A5\u540E\u81EA\u52A8\u8BC6\u522B", onChange: (e) => change("gitlabAccount", e.target.value) }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-token", children: "\u8BBF\u95EE\u4EE4\u724C" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { id: "rel-token", className: "rel-input", type: "password", autoComplete: "new-password", value: token, onChange: (e) => {
 		              setToken(e.target.value);
 		              setClearToken(false);
 		            }, placeholder: form.tokenSet ? `\u5DF2\u914D\u7F6E ${form.tokenHint}\uFF0C\u7559\u7A7A\u4FDD\u7559` : "\u586B\u5199 Personal Access Token\uFF08api \u6743\u9650\uFF09" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-hint", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-hint", children: [
 		              form.tokenSource === "env" ? `\u4F7F\u7528\u73AF\u5883\u53D8\u91CF ${form.tokenEnv}` : form.tokenSet ? `\u5DF2\u4FDD\u5B58 ${form.tokenHint}` : "\u5C1A\u672A\u914D\u7F6E\u4EE4\u724C",
 		              " \xB7 \u63A5\u53E3\u4E0D\u8FD4\u56DE\u660E\u6587"
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "rel-hint", children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "checkbox", checked: clearToken, onChange: (e) => setClearToken(e.target.checked) }),
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: "rel-hint", children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "checkbox", checked: clearToken, onChange: (e) => setClearToken(e.target.checked) }),
 		              " \u6E05\u9664\u5DF2\u4FDD\u5B58\u4EE4\u724C\uFF0C\u4F7F\u7528\u73AF\u5883\u53D8\u91CF"
 		            ] })
 		          ] }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-env", children: "\u73AF\u5883\u53D8\u91CF" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-env", className: "rel-input", value: form.tokenEnv, onChange: (e) => change("tokenEnv", e.target.value) })
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-env", children: "\u73AF\u5883\u53D8\u91CF" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { id: "rel-env", className: "rel-input", value: form.tokenEnv, onChange: (e) => change("tokenEnv", e.target.value) })
 		        ] }),
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-actions", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "rel-btn secondary", disabled: busy || clearToken, onClick: () => void testConnection(), children: "\u6D4B\u8BD5 GitLab \u8FDE\u63A5" }),
-		          test && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { role: "status", className: test.ok ? "rel-success" : "rel-error", children: test.ok ? `\u8FDE\u63A5\u6210\u529F \xB7 ${test.account ?? "GitLab"} \xB7 ${test.ms}ms${test.note ? ` \xB7 ${test.note}` : ""}` : test.error })
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-actions", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { className: "rel-btn secondary", disabled: busy || clearToken, onClick: () => void testConnection(), children: "\u6D4B\u8BD5 GitLab \u8FDE\u63A5" }),
+		          test && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { role: "status", className: test.ok ? "rel-success" : "rel-error", children: test.ok ? `\u8FDE\u63A5\u6210\u529F \xB7 ${test.account ?? "GitLab"} \xB7 ${test.ms}ms${test.note ? ` \xB7 ${test.note}` : ""}` : test.error })
 		        ] })
 		      ] }),
-		      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-card", children: [
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h2", { children: "\u626B\u63CF\u76EE\u5F55" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "rel-hint", children: "\u6DFB\u52A0\u9879\u76EE\u6240\u5728\u7684\u7236\u76EE\u5F55\u3002\u4FDD\u5B58\u540E\u81EA\u52A8\u91CD\u65B0\u626B\u63CF\uFF0C\u4E5F\u53EF\u4EE5\u9010\u7EA7\u6D4F\u89C8\u76EE\u5F55\u3002" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "rel-root-list", children: form.roots.map((root) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-root", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("code", { children: root }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "rel-text-btn", onClick: () => change("roots", form.roots.filter((r) => r !== root)), "aria-label": `\u79FB\u9664 ${root}`, children: "\u79FB\u9664" })
+		      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-card", children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { children: "\u626B\u63CF\u76EE\u5F55" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "rel-hint", children: "\u6DFB\u52A0\u9879\u76EE\u6240\u5728\u7684\u7236\u76EE\u5F55\u3002\u4FDD\u5B58\u540E\u81EA\u52A8\u91CD\u65B0\u626B\u63CF\uFF0C\u4E5F\u53EF\u4EE5\u9010\u7EA7\u6D4F\u89C8\u76EE\u5F55\u3002" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "rel-root-list", children: form.roots.map((root) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-root", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("code", { children: root }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", className: "rel-text-btn", onClick: () => change("roots", form.roots.filter((r) => r !== root)), "aria-label": `\u79FB\u9664 ${root}`, children: "\u79FB\u9664" })
 		        ] }, root)) }),
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-inline", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { className: "rel-input", "aria-label": "\u626B\u63CF\u76EE\u5F55\u8DEF\u5F84", value: path, placeholder: "\u4F8B\u5982 D:\\\\xls-code", onChange: (e) => setPath(e.target.value), onKeyDown: (e) => {
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-inline", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { className: "rel-input", "aria-label": "\u626B\u63CF\u76EE\u5F55\u8DEF\u5F84", value: path, placeholder: "\u4F8B\u5982 D:\\\\xls-code", onChange: (e) => setPath(e.target.value), onKeyDown: (e) => {
 		            if (e.key === "Enter") {
 		              e.preventDefault();
 		              void browse(path);
 		            }
 		          } }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "rel-btn secondary", onClick: () => void browse(path), children: "\u6D4F\u89C8\u76EE\u5F55" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "rel-btn secondary", disabled: !path.trim(), onClick: () => addRoot(path), children: "\u6DFB\u52A0\u76EE\u5F55" })
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { className: "rel-btn secondary", onClick: () => void browse(path), children: "\u6D4F\u89C8\u76EE\u5F55" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { className: "rel-btn secondary", disabled: !path.trim(), onClick: () => addRoot(path), children: "\u6DFB\u52A0\u76EE\u5F55" })
 		        ] }),
-		        dirs && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-browser", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-inline", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("code", { children: dirs.path }),
-		            dirs.parent && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "rel-text-btn", onClick: () => void browse(dirs.parent), children: "\u4E0A\u4E00\u7EA7" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "rel-text-btn", onClick: () => addRoot(dirs.path), children: "\u6DFB\u52A0\u5F53\u524D\u76EE\u5F55" })
+		        dirs && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-browser", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-inline", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("code", { children: dirs.path }),
+		            dirs.parent && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { className: "rel-text-btn", onClick: () => void browse(dirs.parent), children: "\u4E0A\u4E00\u7EA7" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { className: "rel-text-btn", onClick: () => addRoot(dirs.path), children: "\u6DFB\u52A0\u5F53\u524D\u76EE\u5F55" })
 		          ] }),
-		          dirs.error && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "rel-error", children: dirs.error }),
-		          dirs.entries.map((dir) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { className: "rel-dir", onClick: () => void browse(dir.path), children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
+		          dirs.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "rel-error", children: dirs.error }),
+		          dirs.entries.map((dir) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("button", { className: "rel-dir", onClick: () => void browse(dir.path), children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { children: [
 		              "\u25B8 ",
 		              dir.name
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("small", { children: dir.isRepo ? "Git \u4ED3\u5E93" : "\u76EE\u5F55" })
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("small", { children: dir.isRepo ? "Git \u4ED3\u5E93" : "\u76EE\u5F55" })
 		          ] }, dir.path)),
-		          !dirs.entries.length && !dirs.error && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "rel-hint", children: "\u6CA1\u6709\u5B50\u76EE\u5F55" })
+		          !dirs.entries.length && !dirs.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "rel-hint", children: "\u6CA1\u6709\u5B50\u76EE\u5F55" })
 		        ] })
 		      ] }),
-		      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-card", children: [
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h2", { children: "\u53D1\u7248\u4E0E\u6027\u80FD" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-grid", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-depth", children: "\u626B\u63CF\u6DF1\u5EA6" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-depth", className: "rel-input", type: "number", min: 1, max: 8, value: form.scanDepth, onChange: (e) => change("scanDepth", Number(e.target.value)) }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-default", children: "\u9ED8\u8BA4\u76EE\u6807\u5206\u652F" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-default", className: "rel-input", value: form.defaultTarget, onChange: (e) => change("defaultTarget", e.target.value) }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-concurrency", children: "\u5E76\u53D1\u6570" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-concurrency", className: "rel-input", type: "number", min: 1, max: 16, value: form.concurrency, onChange: (e) => change("concurrency", Number(e.target.value)) }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-ttl", children: "\u7F13\u5B58\u6709\u6548\u671F / \u79D2" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { id: "rel-ttl", className: "rel-input", type: "number", min: 0, max: 86400, value: form.headCacheTtlSec, onChange: (e) => change("headCacheTtlSec", Number(e.target.value)) }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { htmlFor: "rel-strategy", children: "\u5408\u5E76\u7B56\u7565" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { id: "rel-strategy", className: "rel-select", value: form.mergeStrategy, onChange: (e) => change("mergeStrategy", e.target.value), children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "merge", children: "\u666E\u901A\u5408\u5E76" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "ff-only", children: "\u4EC5\u5FEB\u8FDB" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "no-ff", children: "\u603B\u662F\u521B\u5EFA\u5408\u5E76\u63D0\u4EA4" })
+		      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-card", children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { children: "\u53D1\u7248\u4E0E\u6027\u80FD" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-grid", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-depth", children: "\u626B\u63CF\u6DF1\u5EA6" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { id: "rel-depth", className: "rel-input", type: "number", min: 1, max: 8, value: form.scanDepth, onChange: (e) => change("scanDepth", Number(e.target.value)) }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-default", children: "\u9ED8\u8BA4\u76EE\u6807\u5206\u652F" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { id: "rel-default", className: "rel-input", value: form.defaultTarget, onChange: (e) => change("defaultTarget", e.target.value) }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-concurrency", children: "\u5E76\u53D1\u6570" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { id: "rel-concurrency", className: "rel-input", type: "number", min: 1, max: 16, value: form.concurrency, onChange: (e) => change("concurrency", Number(e.target.value)) }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-ttl", children: "\u7F13\u5B58\u6709\u6548\u671F / \u79D2" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { id: "rel-ttl", className: "rel-input", type: "number", min: 0, max: 86400, value: form.headCacheTtlSec, onChange: (e) => change("headCacheTtlSec", Number(e.target.value)) }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { htmlFor: "rel-strategy", children: "\u5408\u5E76\u7B56\u7565" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("select", { id: "rel-strategy", className: "rel-select", value: form.mergeStrategy, onChange: (e) => change("mergeStrategy", e.target.value), children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("option", { value: "merge", children: "\u666E\u901A\u5408\u5E76" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("option", { value: "ff-only", children: "\u4EC5\u5FEB\u8FDB" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("option", { value: "no-ff", children: "\u603B\u662F\u521B\u5EFA\u5408\u5E76\u63D0\u4EA4" })
 		          ] }),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", {}),
-		          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "checkbox", checked: form.deleteSourceBranch, onChange: (e) => change("deleteSourceBranch", e.target.checked) }),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", {}),
+		          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "checkbox", checked: form.deleteSourceBranch, onChange: (e) => change("deleteSourceBranch", e.target.checked) }),
 		            " \u5408\u5E76\u540E\u5220\u9664\u6E90\u5206\u652F"
 		          ] })
 		        ] })
 		      ] })
 		    ] }),
-		    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rel-save", children: [
-		      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { id: "saveBtn", className: "rel-btn", disabled: busy, onClick: () => void save(), children: busy ? "\u5904\u7406\u4E2D\u2026" : "\u4FDD\u5B58\u8BBE\u7F6E" }),
-		      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { role: "status", children: message })
+		    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-save", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { id: "saveBtn", className: "rel-btn", disabled: busy, onClick: () => void save(), children: busy ? "\u5904\u7406\u4E2D\u2026" : "\u4FDD\u5B58\u8BBE\u7F6E" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { role: "status", children: message })
 		    ] })
 		  ] });
 		}
 
 		// src/client/TasksPanel.tsx
-		var import_react3 = require("react");
-		var import_jsx_runtime3 = require("react/jsx-runtime");
+		var import_react4 = require("react");
+		var import_jsx_runtime4 = require("react/jsx-runtime");
 		function TasksPanel({ onReuse }) {
-		  const [tasks, setTasks] = (0, import_react3.useState)([]);
-		  const [error, setError] = (0, import_react3.useState)("");
-		  const [busy, setBusy] = (0, import_react3.useState)(false);
+		  const [tasks, setTasks] = (0, import_react4.useState)([]);
+		  const [error, setError] = (0, import_react4.useState)("");
+		  const [busy, setBusy] = (0, import_react4.useState)(false);
 		  const load = async () => {
 		    setBusy(true);
 		    setError("");
@@ -384,18 +537,18 @@ window.__ModuleLoader__.load({
 		      setBusy(false);
 		    }
 		  };
-		  (0, import_react3.useEffect)(() => {
+		  (0, import_react4.useEffect)(() => {
 		    void load();
 		  }, []);
-		  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { id: "taskCard", className: "rel-card", children: [
-		    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rel-head", children: [
-		      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { children: "\u4EFB\u52A1\u4E2D\u5FC3" }),
-		      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { className: "rel-btn secondary", disabled: busy, onClick: () => void load(), children: "\u5237\u65B0\u8BB0\u5F55" })
+		  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { id: "taskCard", className: "rel-card", children: [
+		    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-head", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h2", { children: "\u4EFB\u52A1\u4E2D\u5FC3" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn secondary", disabled: busy, onClick: () => void load(), children: "\u5237\u65B0\u8BB0\u5F55" })
 		    ] }),
-		    error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "rel-error", role: "alert", children: error }),
-		    !tasks.length && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "rel-empty", children: busy ? "\u6B63\u5728\u8BFB\u53D6\u4EFB\u52A1\u2026" : "\u6682\u65E0\u6267\u884C\u8BB0\u5F55\u3002\u6267\u884C\u53D1\u7248\u540E\u53EF\u5728\u8FD9\u91CC\u67E5\u770B\u7ED3\u679C\u3002" }),
-		    tasks.map((task) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("details", { className: "rel-card", children: [
-		      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("summary", { children: [
+		    error && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "rel-error", role: "alert", children: error }),
+		    !tasks.length && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "rel-empty", children: busy ? "\u6B63\u5728\u8BFB\u53D6\u4EFB\u52A1\u2026" : "\u6682\u65E0\u6267\u884C\u8BB0\u5F55\u3002\u6267\u884C\u53D1\u7248\u540E\u53EF\u5728\u8FD9\u91CC\u67E5\u770B\u7ED3\u679C\u3002" }),
+		    tasks.map((task) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("details", { className: "rel-card", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("summary", { children: [
 		        task.sourceBranch,
 		        " \u2192 ",
 		        task.targetBranch,
@@ -406,29 +559,29 @@ window.__ModuleLoader__.load({
 		        " / \u8DF3\u8FC7 ",
 		        task.skipped,
 		        " ",
-		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "rel-hint", children: new Date(task.startedAt).toLocaleString() })
+		        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "rel-hint", children: new Date(task.startedAt).toLocaleString() })
 		      ] }),
-		      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("table", { className: "rel-table", children: [
-		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("tr", { children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("th", { children: "\u4ED3\u5E93" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("th", { children: "\u7ED3\u679C" })
+		      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("table", { className: "rel-table", children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u4ED3\u5E93" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u7ED3\u679C" })
 		        ] }) }),
-		        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("tbody", { children: task.results.map((row) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("tr", { children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("td", { children: row.name }),
-		          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("td", { children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("tbody", { children: task.results.map((row) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: row.name }),
+		          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { children: [
 		            row.message,
 		            " ",
-		            row.url && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("a", { className: "rel-link", href: row.url, target: "_blank", rel: "noreferrer", children: "\u6253\u5F00 MR" })
+		            row.url && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("a", { className: "rel-link", href: row.url, target: "_blank", rel: "noreferrer", children: "\u6253\u5F00 MR" })
 		          ] })
 		        ] }, row.projectId)) })
 		      ] }) }),
-		      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { className: "rel-btn secondary", onClick: () => onReuse(task), children: "\u56DE\u586B\u53C2\u6570" })
+		      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn secondary", onClick: () => onReuse(task), children: "\u56DE\u586B\u53C2\u6570" })
 		    ] }, task.id))
 		  ] });
 		}
 
 		// src/client/ReleasePage.tsx
-		var import_jsx_runtime4 = require("react/jsx-runtime");
+		var import_jsx_runtime5 = require("react/jsx-runtime");
 		function sourceBranchOrder(item) {
 		  if (item.sourceSha) return 0;
 		  return item.checks.some((check) => check.id === "source-exists" && check.status === "danger") ? 2 : 1;
@@ -476,6 +629,7 @@ window.__ModuleLoader__.load({
 		.rel-brand { padding: 4px 12px 22px; font-size: 11px; letter-spacing: .16em; color: var(--dsw-alias-label-tertiary); }
 		.rel-nav button { display: block; text-align: left; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; margin-bottom: 5px; }
 		.rel-nav button[aria-current=page] { background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent); color: var(--dsw-alias-state-business-primary); font-weight: 600; }
+		.rel-nav button:disabled { opacity: .5; cursor: default; }
 		.rel-content { max-width: 1160px; margin: 0 auto; }
 		.rel-head h1 { font-size: 20px; font-weight: 600; }
 		.rel-head { align-items: center; }
@@ -509,7 +663,7 @@ window.__ModuleLoader__.load({
 		@media (max-width: 780px) { .rel-shell { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); } .rel-nav { padding: 8px 12px; display: flex; gap: 6px; border-right: 0; border-bottom: 1px solid var(--dsw-alias-settings-card-stroke); } .rel-brand { display: none; } .rel-nav button { width: auto; margin: 0; } .rel-page { padding: 18px 14px 40px; } .rel-grid { grid-template-columns: 1fr; gap: 6px; } .rel-card { padding: 16px; } .rel-head { align-items: flex-start; } }
 		`;
 		function Tag({ tone, children }) {
-		  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: `rel-tag ${tone}`, children });
+		  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: `rel-tag ${tone}`, children });
 		}
 		function planTone(item) {
 		  if (item.noop) return "plain";
@@ -525,40 +679,41 @@ window.__ModuleLoader__.load({
 		  unknown: ["\u672A\u77E5", "plain"]
 		};
 		function ReleasePage({ initialTab = "release" } = {}) {
-		  const [tab, setTab] = (0, import_react4.useState)(initialTab);
-		  const [settings, setSettings] = (0, import_react4.useState)(null);
-		  const [catalog, setCatalog] = (0, import_react4.useState)(null);
-		  const [catalogError, setCatalogError] = (0, import_react4.useState)("");
-		  const [catalogVersion, setCatalogVersion] = (0, import_react4.useState)(0);
-		  const forceCatalog = (0, import_react4.useRef)(false);
-		  const [projectQuery, setProjectQuery] = (0, import_react4.useState)("");
-		  const [projects, setProjects] = (0, import_react4.useState)([]);
-		  const [selected, setSelected] = (0, import_react4.useState)({});
-		  const [mode, setMode] = (0, import_react4.useState)("create-mr");
-		  const [source, setSource] = (0, import_react4.useState)("");
-		  const [target, setTarget] = (0, import_react4.useState)("");
-		  const [title, setTitle] = (0, import_react4.useState)("");
-		  const [description, setDescription] = (0, import_react4.useState)("");
-		  const [plan, setPlan] = (0, import_react4.useState)(null);
-		  const planItems = (0, import_react4.useMemo)(() => [...plan?.items ?? []].sort((a, b) => sourceBranchOrder(a) - sourceBranchOrder(b)), [plan]);
-		  const [applied, setApplied] = (0, import_react4.useState)(null);
-		  const [mrs, setMrs] = (0, import_react4.useState)(null);
-		  const [loadingProjects, setLoadingProjects] = (0, import_react4.useState)(false);
-		  const [checking, setChecking] = (0, import_react4.useState)(false);
-		  const [applying, setApplying] = (0, import_react4.useState)(false);
-		  const checkRequest = (0, import_react4.useRef)(null);
-		  const formLocked = loadingProjects || applying;
+		  const [tab, setTab] = (0, import_react5.useState)(initialTab);
+		  const [settings, setSettings] = (0, import_react5.useState)(null);
+		  const [catalog, setCatalog] = (0, import_react5.useState)(null);
+		  const [catalogError, setCatalogError] = (0, import_react5.useState)("");
+		  const [catalogVersion, setCatalogVersion] = (0, import_react5.useState)(0);
+		  const forceCatalog = (0, import_react5.useRef)(false);
+		  const [projectQuery, setProjectQuery] = (0, import_react5.useState)("");
+		  const [projects, setProjects] = (0, import_react5.useState)([]);
+		  const [selected, setSelected] = (0, import_react5.useState)({});
+		  const [mode, setMode] = (0, import_react5.useState)("create-mr");
+		  const [source, setSource] = (0, import_react5.useState)("");
+		  const [target, setTarget] = (0, import_react5.useState)("");
+		  const [title, setTitle] = (0, import_react5.useState)("");
+		  const [description, setDescription] = (0, import_react5.useState)("");
+		  const [plan, setPlan] = (0, import_react5.useState)(null);
+		  const planItems = (0, import_react5.useMemo)(() => [...plan?.items ?? []].sort((a, b) => sourceBranchOrder(a) - sourceBranchOrder(b)), [plan]);
+		  const [applied, setApplied] = (0, import_react5.useState)(null);
+		  const [mrs, setMrs] = (0, import_react5.useState)(null);
+		  const [loadingProjects, setLoadingProjects] = (0, import_react5.useState)(false);
+		  const [checking, setChecking] = (0, import_react5.useState)(false);
+		  const [applying, setApplying] = (0, import_react5.useState)(false);
+		  const [creatingBranches, setCreatingBranches] = (0, import_react5.useState)(false);
+		  const checkRequest = (0, import_react5.useRef)(null);
+		  const formLocked = loadingProjects || applying || creatingBranches;
 		  const busy = formLocked || checking;
-		  const [status, setStatus] = (0, import_react4.useState)("\u6B63\u5728\u52A0\u8F7D\u2026");
+		  const [status, setStatus] = (0, import_react5.useState)("\u6B63\u5728\u52A0\u8F7D\u2026");
 		  const hint = applying ? "\u6267\u884C\u4E2D\u2026" : loadingProjects ? "\u6B63\u5728\u8BFB\u53D6\u4ED3\u5E93\u2026" : checking ? "\u9884\u68C0\u4E2D\uFF0C\u53EF\u4FEE\u6539\u53C2\u6570\u6216\u53D6\u6D88\u2026" : "";
-		  const [toast, setToast] = (0, import_react4.useState)("");
-		  const toastTimer = (0, import_react4.useRef)(void 0);
-		  const notify = (0, import_react4.useCallback)((text) => {
+		  const [toast, setToast] = (0, import_react5.useState)("");
+		  const toastTimer = (0, import_react5.useRef)(void 0);
+		  const notify = (0, import_react5.useCallback)((text) => {
 		    setToast(text);
 		    window.clearTimeout(toastTimer.current);
 		    toastTimer.current = window.setTimeout(() => setToast(""), 2600);
 		  }, []);
-		  (0, import_react4.useEffect)(() => {
+		  (0, import_react5.useEffect)(() => {
 		    if (document.getElementById(STYLE_ID) !== null) return;
 		    const style = document.createElement("style");
 		    style.id = STYLE_ID;
@@ -569,7 +724,7 @@ window.__ModuleLoader__.load({
 		      style.remove();
 		    };
 		  }, []);
-		  const loadProjects = (0, import_react4.useCallback)(async (refresh) => {
+		  const loadProjects = (0, import_react5.useCallback)(async (refresh) => {
 		    setLoadingProjects(true);
 		    try {
 		      const value = await api(
@@ -583,20 +738,20 @@ window.__ModuleLoader__.load({
 		      setLoadingProjects(false);
 		    }
 		  }, []);
-		  (0, import_react4.useEffect)(() => {
+		  (0, import_react5.useEffect)(() => {
 		    void loadProjects(false);
 		  }, [loadProjects]);
-		  const loadSettings = (0, import_react4.useCallback)(async () => {
+		  const loadSettings = (0, import_react5.useCallback)(async () => {
 		    try {
 		      setSettings(await api("/settings"));
 		    } catch (e) {
 		      notify(`\u8BFB\u53D6\u8BBE\u7F6E\u5931\u8D25\uFF1A${e.message}`);
 		    }
 		  }, [notify]);
-		  (0, import_react4.useEffect)(() => {
+		  (0, import_react5.useEffect)(() => {
 		    void loadSettings();
 		  }, [loadSettings]);
-		  (0, import_react4.useEffect)(() => () => {
+		  (0, import_react5.useEffect)(() => () => {
 		    window.clearTimeout(toastTimer.current);
 		    const request = checkRequest.current;
 		    checkRequest.current = null;
@@ -606,7 +761,7 @@ window.__ModuleLoader__.load({
 		    }
 		  }, []);
 		  const projectKey = projects.map((p) => p.id).join(",");
-		  (0, import_react4.useEffect)(() => {
+		  (0, import_react5.useEffect)(() => {
 		    if (!projectKey) {
 		      setCatalog(null);
 		      return;
@@ -632,11 +787,11 @@ window.__ModuleLoader__.load({
 		      window.clearTimeout(timer);
 		    };
 		  }, [projectKey, catalogVersion]);
-		  const selectedIds = (0, import_react4.useMemo)(
+		  const selectedIds = (0, import_react5.useMemo)(
 		    () => projects.filter((p) => p.enabled && selected[p.id] !== false).map((p) => p.id),
 		    [projects, selected]
 		  );
-		  const options = (0, import_react4.useMemo)(() => {
+		  const options = (0, import_react5.useMemo)(() => {
 		    const ids = new Set(selectedIds);
 		    return (catalog?.options ?? []).map((o) => ({
 		      ...o,
@@ -648,7 +803,7 @@ window.__ModuleLoader__.load({
 		    forceCatalog.current = true;
 		    setCatalogVersion((n) => n + 1);
 		  };
-		  const cancelCheck = (0, import_react4.useCallback)(() => {
+		  const cancelCheck = (0, import_react5.useCallback)(() => {
 		    const request = checkRequest.current;
 		    checkRequest.current = null;
 		    if (request) {
@@ -657,7 +812,7 @@ window.__ModuleLoader__.load({
 		    }
 		    setChecking(false);
 		  }, []);
-		  const invalidatePlan = (0, import_react4.useCallback)(() => {
+		  const invalidatePlan = (0, import_react5.useCallback)(() => {
 		    cancelCheck();
 		    setPlan(null);
 		    setApplied(null);
@@ -670,8 +825,8 @@ window.__ModuleLoader__.load({
 		    void loadProjects(false);
 		    setCatalogVersion((n) => n + 1);
 		  };
-		  (0, import_react4.useEffect)(invalidatePlan, [invalidatePlan, mode, source, target, title, description, selectedIds]);
-		  const doCheck = (0, import_react4.useCallback)(async () => {
+		  (0, import_react5.useEffect)(invalidatePlan, [invalidatePlan, mode, source, target, title, description, selectedIds]);
+		  const doCheck = (0, import_react5.useCallback)(async () => {
 		    if (!source.trim()) {
 		      notify("\u8BF7\u5148\u586B\u6E90\u5206\u652F");
 		      return;
@@ -719,7 +874,7 @@ window.__ModuleLoader__.load({
 		      }
 		    }
 		  }, [source, mode, target, title, description, selectedIds, notify, cancelCheck]);
-		  const doApply = (0, import_react4.useCallback)(async () => {
+		  const doApply = (0, import_react5.useCallback)(async () => {
 		    if (plan === null) return;
 		    const executable = plan.summary.executable;
 		    if (!executable) {
@@ -742,7 +897,7 @@ window.__ModuleLoader__.load({
 		      setApplying(false);
 		    }
 		  }, [plan, notify]);
-		  const loadMrs = (0, import_react4.useCallback)(async () => {
+		  const loadMrs = (0, import_react5.useCallback)(async () => {
 		    try {
 		      const value = await api("/mrs");
 		      setMrs(value);
@@ -751,23 +906,27 @@ window.__ModuleLoader__.load({
 		      notify(`MR \u72B6\u6001\uFF1A${error.message}`);
 		    }
 		  }, [notify]);
-		  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-shell", children: [
-		    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("nav", { className: "rel-nav", "aria-label": "\u53D1\u7248\u5BFC\u822A", children: [
-		      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-brand", children: "RELEASE DESK" }),
-		      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { "aria-current": tab === "release" ? "page" : void 0, onClick: () => setTab("release"), children: "\u6279\u91CF\u53D1\u7248" }),
-		      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { "aria-current": tab === "tasks" ? "page" : void 0, onClick: () => setTab("tasks"), children: "\u4EFB\u52A1\u4E2D\u5FC3" }),
-		      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { "aria-current": tab === "settings" ? "page" : void 0, onClick: () => setTab("settings"), children: "\u53D1\u7248\u8BBE\u7F6E" })
+		  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-shell", children: [
+		    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("nav", { className: "rel-nav", "aria-label": "\u53D1\u7248\u5BFC\u822A", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-brand", children: "RELEASE DESK" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { disabled: creatingBranches || applying, "aria-current": tab === "release" ? "page" : void 0, onClick: () => setTab("release"), children: "\u6279\u91CF\u53D1\u7248" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { disabled: creatingBranches || applying, "aria-current": tab === "branches" ? "page" : void 0, onClick: () => {
+		        cancelCheck();
+		        setTab("branches");
+		      }, children: "\u6279\u91CF\u521B\u5EFA\u5206\u652F" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { disabled: creatingBranches || applying, "aria-current": tab === "tasks" ? "page" : void 0, onClick: () => setTab("tasks"), children: "\u4EFB\u52A1\u4E2D\u5FC3" }),
+		      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { disabled: creatingBranches || applying, "aria-current": tab === "settings" ? "page" : void 0, onClick: () => setTab("settings"), children: "\u53D1\u7248\u8BBE\u7F6E" })
 		    ] }),
-		    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-page", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-content", children: [
-		      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-head", children: [
-		        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h1", { children: tab === "settings" ? "\u53D1\u7248\u8BBE\u7F6E" : tab === "tasks" ? "\u4EFB\u52A1\u4E2D\u5FC3" : "\u6279\u91CF\u53D1\u7248" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "rel-status", children: status })
+		    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-page", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-content", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-head", children: [
+		        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h1", { children: tab === "settings" ? "\u53D1\u7248\u8BBE\u7F6E" : tab === "tasks" ? "\u4EFB\u52A1\u4E2D\u5FC3" : tab === "branches" ? "\u6279\u91CF\u521B\u5EFA\u5206\u652F" : "\u6279\u91CF\u53D1\u7248" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "rel-status", children: status })
 		        ] }),
-		        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn secondary", onClick: () => setTab(tab === "settings" ? "release" : "settings"), children: tab === "settings" ? "\u8FD4\u56DE\u53D1\u7248" : "\u8BBE\u7F6E" })
+		        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-btn secondary", disabled: creatingBranches || applying, onClick: () => setTab(tab === "settings" ? "release" : "settings"), children: tab === "settings" ? "\u8FD4\u56DE\u53D1\u7248" : "\u8BBE\u7F6E" })
 		      ] }),
-		      tab === "settings" && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SettingsPanel, { onSaved: savedSettings }),
-		      tab === "tasks" && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(TasksPanel, { onReuse: (task) => {
+		      tab === "settings" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(SettingsPanel, { onSaved: savedSettings }),
+		      tab === "tasks" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(TasksPanel, { onReuse: (task) => {
 		        setMode(task.mode);
 		        setSource(task.sourceBranch);
 		        setTarget(task.targetBranch);
@@ -776,39 +935,52 @@ window.__ModuleLoader__.load({
 		        invalidatePlan();
 		        setTab("release");
 		      } }),
-		      tab === "release" && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
-		        settings && (!settings.gitlabReady || !settings.roots.length) && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-notice", children: [
+		      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { hidden: tab !== "branches", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+		        BranchCreatePanel,
+		        {
+		          projects,
+		          gitlabReady: settings?.gitlabReady ?? false,
+		          loading: loadingProjects || applying,
+		          onBusyChange: (value) => {
+		            setCreatingBranches(value);
+		            if (value) invalidatePlan();
+		          },
+		          onCreated: refreshBranches
+		        }
+		      ) }),
+		      tab === "release" && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+		        settings && (!settings.gitlabReady || !settings.roots.length) && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-notice", children: [
 		          !settings.roots.length ? "\u8BF7\u5148\u6DFB\u52A0\u626B\u63CF\u76EE\u5F55\uFF0C\u53D1\u73B0\u672C\u5730\u4ED3\u5E93\u3002" : "GitLab \u8FDE\u63A5\u5C1A\u672A\u914D\u9F50\uFF0C\u8BF7\u5230\u8BBE\u7F6E\u4E2D\u914D\u7F6E\u5730\u5740\u4E0E\u4EE4\u724C\u3002",
 		          " ",
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-text-btn", onClick: () => setTab("settings"), children: "\u6253\u5F00\u8BBE\u7F6E \u2192" })
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-text-btn", onClick: () => setTab("settings"), children: "\u6253\u5F00\u8BBE\u7F6E \u2192" })
 		        ] }),
-		        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-card", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h2", { children: "\u53D1\u7248\u53C2\u6570" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-grid", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("label", { children: "\u6A21\u5F0F" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("select", { className: "rel-select", "aria-label": "\u6A21\u5F0F", disabled: formLocked, value: mode, onChange: (e) => {
+		        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-card", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h2", { children: "\u53D1\u7248\u53C2\u6570" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-grid", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("label", { children: "\u6A21\u5F0F" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("select", { className: "rel-select", "aria-label": "\u6A21\u5F0F", disabled: formLocked, value: mode, onChange: (e) => {
 		              invalidatePlan();
 		              setMode(e.target.value);
 		            }, children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: "create-mr", children: "\u53EA\u5EFA MR\uFF08\u5408\u5E76\u7559\u7ED9 GitLab\uFF09" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: "merge-mr", children: "\u5728 GitLab \u5408\u5E76 MR" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: "merge-git", children: "\u672C\u5730\u5408\u5E76\u540E\u63A8\u9001" })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "create-mr", children: "\u53EA\u5EFA MR\uFF08\u5408\u5E76\u7559\u7ED9 GitLab\uFF09" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "merge-mr", children: "\u5728 GitLab \u5408\u5E76 MR" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "merge-git", children: "\u672C\u5730\u5408\u5E76\u540E\u63A8\u9001" })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("label", { children: "\u6E90\u5206\u652F" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(BranchInput, { label: "\u6E90\u5206\u652F", value: source, onChange: (value) => {
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("label", { children: "\u6E90\u5206\u652F" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(BranchInput, { label: "\u6E90\u5206\u652F", value: source, onChange: (value) => {
 		                invalidatePlan();
 		                setSource(value);
 		              }, options, loading: projects.length > 0 && (catalog?.loading ?? !catalog), error: catalogError || (catalog?.errors.length ? catalog.errors.length + " \u4E2A\u4ED3\u5E93\u8FDC\u7AEF\u8BFB\u53D6\u5931\u8D25\uFF0C\u4FDD\u7559\u672C\u5730\u5019\u9009" : ""), onRefresh: refreshBranches, placeholder: "\u8F93\u5165\u5173\u952E\u5B57\uFF0C\u6A21\u7CCA\u5339\u914D\u5206\u652F", disabled: formLocked }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-hint", children: "\u5339\u914D\u5206\u652F\u540D\u540E\u9009\u62E9\uFF1B\u5019\u9009\u4EC5\u7528\u4E8E\u8F85\u52A9\uFF0C\u9884\u68C0\u4F1A\u6838\u5B9E\u8FDC\u7AEF\u3002" })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-hint", children: "\u5339\u914D\u5206\u652F\u540D\u540E\u9009\u62E9\uFF1B\u5019\u9009\u4EC5\u7528\u4E8E\u8F85\u52A9\uFF0C\u9884\u68C0\u4F1A\u6838\u5B9E\u8FDC\u7AEF\u3002" })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("label", { children: "\u76EE\u6807\u5206\u652F" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(BranchInput, { label: "\u76EE\u6807\u5206\u652F", value: target, onChange: (value) => {
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("label", { children: "\u76EE\u6807\u5206\u652F" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(BranchInput, { label: "\u76EE\u6807\u5206\u652F", value: target, onChange: (value) => {
 		              invalidatePlan();
 		              setTarget(value);
 		            }, options, loading: projects.length > 0 && (catalog?.loading ?? !catalog), error: catalogError, onRefresh: refreshBranches, placeholder: settings ? "\u7559\u7A7A = \u5404\u4ED3\u5E93\u9ED8\u8BA4\uFF08" + settings.defaultTarget + "\uFF09" : "\u7559\u7A7A = \u5404\u4ED3\u5E93\u9ED8\u8BA4", disabled: formLocked }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("label", { children: "\u6807\u9898" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("label", { children: "\u6807\u9898" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
 		              "input",
 		              {
 		                className: "rel-input",
@@ -821,8 +993,8 @@ window.__ModuleLoader__.load({
 		                }
 		              }
 		            ),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("label", { children: "\u8BF4\u660E" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("label", { children: "\u8BF4\u660E" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
 		              "textarea",
 		              {
 		                className: "rel-textarea",
@@ -836,23 +1008,23 @@ window.__ModuleLoader__.load({
 		                }
 		              }
 		            ),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("label", { children: "\u4ED3\u5E93" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-inline", style: { marginBottom: 10 }, children: [
-		                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("input", { className: "rel-input", "aria-label": "\u641C\u7D22\u4ED3\u5E93", placeholder: "\u7B5B\u9009\u4ED3\u5E93\u540D\u79F0\u6216\u8DEF\u5F84", value: projectQuery, onChange: (e) => setProjectQuery(e.target.value) }),
-		                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-text-btn", disabled: formLocked, onClick: () => {
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("label", { children: "\u4ED3\u5E93" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-inline", style: { marginBottom: 10 }, children: [
+		                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("input", { className: "rel-input", "aria-label": "\u641C\u7D22\u4ED3\u5E93", placeholder: "\u7B5B\u9009\u4ED3\u5E93\u540D\u79F0\u6216\u8DEF\u5F84", value: projectQuery, onChange: (e) => setProjectQuery(e.target.value) }),
+		                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-text-btn", disabled: formLocked, onClick: () => {
 		                  invalidatePlan();
 		                  setSelected({});
 		                }, children: "\u5168\u9009" }),
-		                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-text-btn", disabled: formLocked, onClick: () => {
+		                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-text-btn", disabled: formLocked, onClick: () => {
 		                  invalidatePlan();
 		                  setSelected(Object.fromEntries(projects.map((p) => [p.id, false])));
 		                }, children: "\u6E05\u7A7A" })
 		              ] }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-chips", children: projects.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "rel-muted", children: "\u6CA1\u6709\u53EF\u7528\u4ED3\u5E93\uFF0C\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u626B\u63CF\u76EE\u5F55" }) : projects.filter((p) => (p.name + p.gitlabPath).toLowerCase().includes(projectQuery.toLowerCase())).map((project) => {
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-chips", children: projects.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "rel-muted", children: "\u6CA1\u6709\u53EF\u7528\u4ED3\u5E93\uFF0C\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u626B\u63CF\u76EE\u5F55" }) : projects.filter((p) => (p.name + p.gitlabPath).toLowerCase().includes(projectQuery.toLowerCase())).map((project) => {
 		                const checked = selected[project.id] !== false;
-		                return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("label", { className: `rel-chip${checked ? "" : " off"}`, title: project.defaultTarget ? `${project.name} \xB7 \u9ED8\u8BA4\u76EE\u6807 ${project.defaultTarget}` : project.name, children: [
-		                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+		                return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("label", { className: `rel-chip${checked ? "" : " off"}`, title: project.defaultTarget ? `${project.name} \xB7 \u9ED8\u8BA4\u76EE\u6807 ${project.defaultTarget}` : project.name, children: [
+		                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
 		                    "input",
 		                    {
 		                      type: "checkbox",
@@ -868,7 +1040,7 @@ window.__ModuleLoader__.load({
 		                  project.name
 		                ] }, project.id);
 		              }) }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-hint", children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-hint", children: [
 		                "\u5DF2\u9009 ",
 		                selectedIds.length,
 		                " / ",
@@ -880,192 +1052,192 @@ window.__ModuleLoader__.load({
 		              ] })
 		            ] })
 		          ] }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-actions", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn", disabled: busy || !selectedIds.length || !source.trim(), onClick: () => void doCheck(), children: checking ? "\u9884\u68C0\u4E2D\u2026" : "\u9884\u68C0" }),
-		            checking && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn secondary", onClick: () => {
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-actions", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-btn", disabled: busy || !selectedIds.length || !source.trim(), onClick: () => void doCheck(), children: checking ? "\u9884\u68C0\u4E2D\u2026" : "\u9884\u68C0" }),
+		            checking && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-btn secondary", onClick: () => {
 		              cancelCheck();
 		              notify("\u5DF2\u53D6\u6D88\u9884\u68C0");
 		            }, children: "\u53D6\u6D88\u9884\u68C0" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn secondary", disabled: catalog?.loading || busy, onClick: refreshBranches, children: "\u5237\u65B0\u5206\u652F" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn secondary", disabled: busy, onClick: () => {
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-btn secondary", disabled: catalog?.loading || busy, onClick: refreshBranches, children: "\u5237\u65B0\u5206\u652F" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-btn secondary", disabled: busy, onClick: () => {
 		              invalidatePlan();
 		              void loadProjects(true).then(() => {
 		                setCatalog(null);
 		                setCatalogVersion((n) => n + 1);
 		              });
 		            }, children: "\u91CD\u65B0\u626B\u63CF\u4ED3\u5E93" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "rel-hint", children: hint })
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "rel-hint", children: hint })
 		          ] })
 		        ] }),
-		        plan !== null && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-card", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h2", { children: "\u9884\u68C0\u7ED3\u679C" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-summary", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		        plan !== null && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-card", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h2", { children: "\u9884\u68C0\u7ED3\u679C" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-summary", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u4ED3\u5E93 ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: plan.summary.total })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: plan.summary.total })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u53EF\u6267\u884C ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: plan.summary.executable })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: plan.summary.executable })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u65E0\u53D8\u5316 ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: plan.summary.noop ?? 0 })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: plan.summary.noop ?? 0 })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u963B\u585E ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: plan.summary.blocked ?? plan.summary.total - plan.summary.executable })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: plan.summary.blocked ?? plan.summary.total - plan.summary.executable })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u9884\u68C0\u7528\u65F6 ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("b", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("b", { children: [
 		                plan.checkDurationMs,
 		                "ms"
 		              ] })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "rel-muted", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "rel-muted", children: [
 		              "\u8BA1\u5212 ",
 		              plan.id.slice(0, 8),
 		              "\u2026 \u6709\u6548\u81F3 ",
 		              new Date(plan.expiresAt).toLocaleTimeString()
 		            ] })
 		          ] }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("table", { className: "rel-table", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u4ED3\u5E93" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u7ED3\u679C" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u63D0\u4EA4" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "MR" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u8BF4\u660E" })
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("table", { className: "rel-table", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("tr", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u4ED3\u5E93" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u7ED3\u679C" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u63D0\u4EA4" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "MR" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u8BF4\u660E" })
 		            ] }) }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("tbody", { children: planItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: item.name }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Tag, { tone: planTone(item), children: item.noop ? "\u65E0\u53D8\u5316" : item.executable ? "\u53EF\u6267\u884C" : "\u963B\u585E" }) }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("tbody", { children: planItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("tr", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { children: item.name }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Tag, { tone: planTone(item), children: item.noop ? "\u65E0\u53D8\u5316" : item.executable ? "\u53EF\u6267\u884C" : "\u963B\u585E" }) }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("td", { children: [
 		                item.ahead ?? "?",
 		                " \u2191 / ",
 		                item.behind ?? "?",
 		                " \u2193"
 		              ] }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: item.mr === null ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "rel-muted", children: "\u2014" }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("a", { className: "rel-link", href: item.mr.url, target: "_blank", rel: "noreferrer", children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { children: item.mr === null ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "rel-muted", children: "\u2014" }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("a", { className: "rel-link", href: item.mr.url, target: "_blank", rel: "noreferrer", children: [
 		                "!",
 		                item.mr.iid
 		              ] }) }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { children: [
-		                item.blockers.map((text) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Tag, { tone: "bad", children: text }, text)),
-		                item.warnings.map((text) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Tag, { tone: "warn", children: text }, text)),
-		                item.checks.filter((c) => c.status === "danger" || c.status === "unknown").map((c) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(Tag, { tone: "bad", children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("td", { children: [
+		                item.blockers.map((text) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Tag, { tone: "bad", children: text }, text)),
+		                item.warnings.map((text) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Tag, { tone: "warn", children: text }, text)),
+		                item.checks.filter((c) => c.status === "danger" || c.status === "unknown").map((c) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(Tag, { tone: "bad", children: [
 		                  c.label,
 		                  c.detail ? `\uFF1A${c.detail}` : ""
 		                ] }, c.id)),
-		                item.checks.filter((c) => c.status === "warn").map((c) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(Tag, { tone: "warn", children: [
+		                item.checks.filter((c) => c.status === "warn").map((c) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(Tag, { tone: "warn", children: [
 		                  c.label,
 		                  c.detail ? `\uFF1A${c.detail}` : ""
 		                ] }, c.id)),
-		                item.blockers.length + item.warnings.length + item.checks.filter((c) => c.status === "danger" || c.status === "unknown" || c.status === "warn").length === 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "rel-muted", children: "\u2014" })
+		                item.blockers.length + item.warnings.length + item.checks.filter((c) => c.status === "danger" || c.status === "unknown" || c.status === "warn").length === 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "rel-muted", children: "\u2014" })
 		              ] })
 		            ] }, item.projectId)) })
 		          ] }) }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-actions", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn", disabled: busy || !plan.summary.executable, onClick: () => void doApply(), children: "\u786E\u8BA4\u6267\u884C" }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "rel-hint", children: plan.summary.executable ? `\u5C06\u5904\u7406 ${String(plan.summary.executable)} \u4E2A\u4ED3\u5E93\uFF0C10 \u5206\u949F\u5185\u6709\u6548` : "\u6CA1\u6709\u53EF\u6267\u884C\u7684\u4ED3\u5E93" })
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-actions", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-btn", disabled: busy || !plan.summary.executable, onClick: () => void doApply(), children: "\u786E\u8BA4\u6267\u884C" }),
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "rel-hint", children: plan.summary.executable ? `\u5C06\u5904\u7406 ${String(plan.summary.executable)} \u4E2A\u4ED3\u5E93\uFF0C10 \u5206\u949F\u5185\u6709\u6548` : "\u6CA1\u6709\u53EF\u6267\u884C\u7684\u4ED3\u5E93" })
 		          ] })
 		        ] }),
-		        applied !== null && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-card", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h2", { children: "\u6267\u884C\u7ED3\u679C" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-summary", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		        applied !== null && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-card", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h2", { children: "\u6267\u884C\u7ED3\u679C" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-summary", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u6210\u529F ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: applied.succeeded })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: applied.succeeded })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u5931\u8D25 ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: applied.failed })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: applied.failed })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u8DF3\u8FC7 ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: applied.skipped })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: applied.skipped })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u7528\u65F6 ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("b", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("b", { children: [
 		                applied.durationMs,
 		                "ms"
 		              ] })
 		            ] })
 		          ] }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("table", { className: "rel-table", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u4ED3\u5E93" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u7ED3\u679C" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u8BF4\u660E" })
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("table", { className: "rel-table", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("tr", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u4ED3\u5E93" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u7ED3\u679C" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u8BF4\u660E" })
 		            ] }) }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("tbody", { children: applied.results.map((row) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: row.name }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Tag, { tone: row.ok ? "ok" : "bad", children: row.ok ? "\u6210\u529F" : "\u5931\u8D25" }) }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("tbody", { children: applied.results.map((row) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("tr", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { children: row.name }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Tag, { tone: row.ok ? "ok" : "bad", children: row.ok ? "\u6210\u529F" : "\u5931\u8D25" }) }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("td", { children: [
 		                row.message,
-		                row.url ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+		                row.url ? /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
 		                  " \xB7 ",
-		                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("a", { className: "rel-link", href: row.url, target: "_blank", rel: "noreferrer", children: "\u6253\u5F00" })
+		                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("a", { className: "rel-link", href: row.url, target: "_blank", rel: "noreferrer", children: "\u6253\u5F00" })
 		                ] }) : null
 		              ] })
 		            ] }, row.projectId)) })
 		          ] }) })
 		        ] }),
-		        mrs !== null && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-card", children: [
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h2", { children: "MR \u72B6\u6001" }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "rel-summary", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		        mrs !== null && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-card", children: [
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h2", { children: "MR \u72B6\u6001" }),
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rel-summary", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "MR ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: mrs.total })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: mrs.total })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u51B2\u7A81 ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: mrs.conflicts })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: mrs.conflicts })
 		            ] }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
 		              "\u8BA1\u7B97\u4E2D ",
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("b", { children: mrs.checking })
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("b", { children: mrs.checking })
 		            ] })
 		          ] }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("table", { className: "rel-table", children: [
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u4ED3\u5E93" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "MR" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u72B6\u6001" }),
-		              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("th", { children: "\u6D41\u6C34\u7EBF" })
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-scroll", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("table", { className: "rel-table", children: [
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("tr", { children: [
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u4ED3\u5E93" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "MR" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u72B6\u6001" }),
+		              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("th", { children: "\u6D41\u6C34\u7EBF" })
 		            ] }) }),
-		            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("tbody", { children: mrs.mrs.map((row) => {
+		            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("tbody", { children: mrs.mrs.map((row) => {
 		              const label = MR_LABEL[row.mr.mergeStatus] ?? [row.mr.mergeStatus, "plain"];
-		              return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("tr", { children: [
-		                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: row.project }),
-		                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("a", { className: "rel-link", href: row.mr.url, target: "_blank", rel: "noreferrer", children: [
+		              return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("tr", { children: [
+		                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { children: row.project }),
+		                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("a", { className: "rel-link", href: row.mr.url, target: "_blank", rel: "noreferrer", children: [
 		                  "!",
 		                  row.mr.iid,
 		                  " ",
 		                  row.mr.title
 		                ] }) }),
-		                /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("td", { children: [
-		                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Tag, { tone: label[1], children: label[0] }),
-		                  row.mr.detail ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "rel-muted", children: row.mr.detail }) : null
+		                /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("td", { children: [
+		                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Tag, { tone: label[1], children: label[0] }),
+		                  row.mr.detail ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "rel-muted", children: row.mr.detail }) : null
 		                ] }),
-		                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("td", { children: row.mr.pipeline })
+		                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("td", { children: row.mr.pipeline })
 		              ] }, row.project);
 		            }) })
 		          ] }) }),
-		          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-actions", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { className: "rel-btn secondary", disabled: busy, onClick: () => void loadMrs(), children: "\u5237\u65B0\u72B6\u6001" }) })
+		          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-actions", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { className: "rel-btn secondary", disabled: busy, onClick: () => void loadMrs(), children: "\u5237\u65B0\u72B6\u6001" }) })
 		        ] })
 		      ] }),
-		      toast !== "" && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "rel-toast", children: toast })
+		      toast !== "" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "rel-toast", children: toast })
 		    ] }) })
 		  ] });
 		}
 
 		// src/client/ReleaseIcon.tsx
-		var import_jsx_runtime5 = require("react/jsx-runtime");
+		var import_jsx_runtime6 = require("react/jsx-runtime");
 		function ReleaseIcon({ size, active }) {
-		  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+		  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
 		    "svg",
 		    {
 		      width: size,
@@ -1079,11 +1251,11 @@ window.__ModuleLoader__.load({
 		      "aria-hidden": "true",
 		      style: { opacity: active ? 1 : 0.72 },
 		      children: [
-		        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M7 20V9" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("circle", { cx: "7", cy: "5", r: "2.4" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M7 13c0-2.2 1.8-4 4-4h4.5" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("circle", { cx: "17.5", cy: "9", r: "2.2" }),
-		        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M14 20l3-3.6 3 3.6" })
+		        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M7 20V9" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "7", cy: "5", r: "2.4" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M7 13c0-2.2 1.8-4 4-4h4.5" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("circle", { cx: "17.5", cy: "9", r: "2.2" }),
+		        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { d: "M14 20l3-3.6 3 3.6" })
 		      ]
 		    }
 		  );
