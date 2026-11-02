@@ -35,7 +35,15 @@ DeepSeek Harness（DSH）插件集合。每个插件是 `plugins/` 下的独立�
 
 ### 2. 获取插件并安装
 
-**从 GitHub 下载并打包（推荐）：**
+**从 npm 安装（推荐，无需下载源码或自己打包）：**
+
+```powershell
+dsh plugin --profile desktop add dsh-plugin-release@latest
+```
+
+安装完成后，继续下面的启用检查、重启和首次配置。查看 [npm 包页面](https://www.npmjs.com/package/dsh-plugin-release)。
+
+**从 GitHub 下载并打包：**
 
 在自己选择的存放目录执行：
 
@@ -58,11 +66,11 @@ dsh plugin --profile desktop add "C:/Downloads/dsh-plugin-release-0.1.0.tgz"
 
 将路径替换成自己的安装包路径。
 
-### 3. 启用插件（不能省略）
+### 3. 检查插件是否启用
 
-安装依赖后，还要检查该 profile 的 `package.json`：通常是 `~/.dsh/profiles/desktop/package.json`；设置过 `DSH_HOME` 时，在 `$DSH_HOME/profiles/desktop/package.json` 下。以本机 Harness 实际使用的配置目录为准。
+新版 Harness 会自动将声明了 `dsh.bundle` 的插件加入启用列表。安装后检查侧边栏和插件设置；旧版或未自动启用时，再检查该 profile 的 `package.json`：通常是 `~/.dsh/profiles/desktop/package.json`；设置过 `DSH_HOME` 时，在 `$DSH_HOME/profiles/desktop/package.json` 下。以本机 Harness 实际使用的配置目录为准。
 
-在现有 **`dsh.profile.bundles` 数组**中追加一次：
+确认现有 **`dsh.profile.bundles` 数组**包含以下名称；缺失时才追加一次，不要重复添加：
 
 ```json
 "dsh-plugin-release"
@@ -99,7 +107,9 @@ dsh plugin --profile desktop add "C:/Downloads/dsh-plugin-release-0.1.0.tgz"
 
 ### 更新插件
 
-通过 Git 下载的，在源码目录执行 `git pull`；通过 ZIP 下载的，重新下载并解压最新版。然后进入 `plugins/release` 执行 `npm pack`，再用 `dsh plugin --profile desktop add <新的安装包路径>` 安装并重启 Harness。已有 bundle 保留一条即可，自己的界面设置无需重新填写。
+通过 npm 安装的，使用 Harness 插件管理中的更新操作；也可执行 `dsh plugin --profile desktop update dsh-plugin-release`，完成后重启 Harness。已有 bundle 保留一条即可，自己的界面设置无需重新填写。
+
+通过 Git 下载的，在源码目录执行 `git pull`；通过 ZIP 下载的，重新下载并解压最新版。然后进入 `plugins/release` 执行 `npm pack`，再用 `dsh plugin --profile desktop add <新的安装包路径>` 安装并重启 Harness。
 
 ### 让 AI 帮你安装（复制下面整段）
 
@@ -109,17 +119,20 @@ dsh plugin --profile desktop add "C:/Downloads/dsh-plugin-release-0.1.0.tgz"
 请帮我安装 DeepSeek Harness 的批量发版插件。
 仓库：https://github.com/guang-gui/dsh-plugin
 插件包名：dsh-plugin-release
+首选 npm 安装：dsh plugin --profile <实际profile> add dsh-plugin-release@latest
 插件在仓库的 plugins/release 子目录，根目录不是可直接安装的插件包。
 
 请直接完成安装和配置，并遵守以下要求：
 1. 先阅读仓库最新 README，检查本机系统、Node/npm、Git、Harness 和 dsh CLI。
    查明实际使用的 profile、DSH_HOME 和配置文件路径，不要假设与作者电脑相同。
    如果缺少 Harness 或找不到 CLI，先说明缺项，按官方说明处理；不要安装同名的无关 npm 包。
-2. 将仓库下载到我指定或合适的目录；已有目录先检查，不要覆盖未提交改动。
+2. 优先通过 npm 包名安装，无需下载源码或自己打包。需要源码或安装包方式时才下载仓库：
+   将仓库下载到我指定或合适的目录；已有目录先检查，不要覆盖未提交改动。
    在 plugins/release 下执行 npm pack，再使用 dsh plugin --profile <实际profile> add <安装包绝对路径>。
    lib 已随源码提供，普通安装不需要重建；安装包名称以实际输出为准。
-3. 修改配置前备份。保留 profile/package.json 的现有内容，只向 dsh.profile.bundles
-   数组追加一次 dsh-plugin-release；保留已有 bundle 和 dependencies，检查 JSON 可解析。
+3. 新版 Harness 会自动启用 bundle，先检查插件是否已启用。
+   仅在未启用时备份并修改 profile/package.json，向 dsh.profile.bundles 数组补充一次
+   dsh-plugin-release；保留已有 bundle 和 dependencies，检查 JSON 可解析。
 4. 提醒我正常重启 Harness；不要直接终止正在使用的桌面程序。
    进入发版设置，配置我自己的项目目录和 GitLab 地址。令牌由我在界面输入，
    或沿用我明确指定的环境变量；不要索要聊天中的明文令牌，不要读取 Git 保存的密码代登录。

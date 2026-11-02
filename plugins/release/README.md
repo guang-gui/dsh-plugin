@@ -102,7 +102,19 @@ http://127.0.0.1:<宿主端口>/release-ui
 
 ## 安装
 
-完整的环境准备、启用步骤、更新方式和可复制给 AI 的安装提示词，见[仓库安装指南](../../README.md#其他人如何安装)。
+完整的环境准备、启用步骤、更新方式和可复制给 AI 的安装提示词，见[仓库安装指南](https://github.com/guang-gui/dsh-plugin#其他人如何安装)。
+
+### 从公共 npm 包安装（推荐）
+
+已安装 Harness 和 `dsh` CLI 后，在 PowerShell 执行：
+
+```powershell
+dsh plugin --profile desktop add dsh-plugin-release@latest
+```
+
+重启 Harness，在「发版 → 设置」添加自己的本地项目目录、GitLab 地址和令牌，测试连接后保存。使用其他 profile 时替换 `desktop`。新版 Harness 会自动启用 bundle；旧版或未启用时，检查实际 profile 的 `dsh.profile.bundles` 是否包含 `dsh-plugin-release`，缺失时补充，保留其他配置。
+
+### 从 GitHub 下载并打包
 
 Windows PowerShell 快速安装（需已安装 Harness、Node/npm、Git 和 `dsh` CLI）：
 
@@ -115,7 +127,7 @@ dsh plugin --profile desktop add ./dsh-plugin-release-0.1.0.tgz
 
 安装包名称以实际输出为准。**本仓库根目录不是插件包，必须在 `plugins/release` 打包。** `lib/` 已随仓库提供，普通安装不需要重新构建。
 
-安装后，在实际 profile 的 `package.json` 中向 `dsh.profile.bundles` 数组追加一次 `dsh-plugin-release`，保留所有原有配置。重启 Harness，从「发版 → 设置」配置自己的项目根目录、GitLab 地址和令牌，并测试连接。
+安装后，按上述方式检查启用状态、重启并完成首次配置。
 
 收到 `.tgz` 的用户可直接执行 `dsh plugin --profile desktop add <安装包路径>`，然后完成相同的启用和配置步骤。使用非桌面 profile 时替换 `desktop`；`headless` 无网页和侧边栏。
 
