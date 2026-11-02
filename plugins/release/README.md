@@ -102,33 +102,22 @@ http://127.0.0.1:<宿主端口>/release-ui
 
 ## 安装
 
-### 从本地目录（开发时用）
+完整的环境准备、启用步骤、更新方式和可复制给 AI 的安装提示词，见[仓库安装指南](../../README.md#其他人如何安装)。
 
-```sh
-dsh plugin --profile web add ./dsh-plugin
-dsh --profile web --dump-config   # 应该能看到 "# == dsh-plugin-release" 这一层
-dsh --profile web
+Windows PowerShell 快速安装（需已安装 Harness、Node/npm、Git 和 `dsh` CLI）：
+
+```powershell
+git clone https://github.com/guang-gui/dsh-plugin.git
+Set-Location ./dsh-plugin/plugins/release
+npm pack
+dsh plugin --profile desktop add ./dsh-plugin-release-0.1.0.tgz
 ```
 
-### 从 tarball
+安装包名称以实际输出为准。**本仓库根目录不是插件包，必须在 `plugins/release` 打包。** `lib/` 已随仓库提供，普通安装不需要重新构建。
 
-```sh
-pnpm pack            # 在 dsh-plugin 目录里执行，产出 dsh-plugin-release-0.1.0.tgz
-dsh plugin --profile web add ./dsh-plugin-release-0.1.0.tgz
-```
+安装后，在实际 profile 的 `package.json` 中向 `dsh.profile.bundles` 数组追加一次 `dsh-plugin-release`，保留所有原有配置。重启 Harness，从「发版 → 设置」配置自己的项目根目录、GitLab 地址和令牌，并测试连接。
 
-### 从 GitHub
-
-```sh
-dsh plugin --profile web add github:<你>/personal-assistant#<commit>
-```
-
-`lib/` 已经随仓库提交，所以 git 安装不需要跑构建脚本。想自己改源码再构建：
-
-```sh
-cd dsh-plugin
-npm run build        # tsc -> lib/
-```
+收到 `.tgz` 的用户可直接执行 `dsh plugin --profile desktop add <安装包路径>`，然后完成相同的启用和配置步骤。使用非桌面 profile 时替换 `desktop`；`headless` 无网页和侧边栏。
 
 ## 配置
 
